@@ -112,7 +112,12 @@ def latest_audit_record(db: Session) -> AuditRecord | None:
 
 
 def seal_record(db: Session, task: Task, decision: Decision) -> AuditRecord:
-    """Assemble snapshot, append to hash chain, persist AuditRecord."""
+    """Assemble snapshot, append to hash chain, persist AuditRecord.
+
+    Note: chain-head allocation (latest record -> previous_hash) is not serialized
+    across concurrent writers. Safe for the single-user demo; concurrent completions
+    would need row locking or a retry on the chain_sequence unique constraint.
+    """
     previous = latest_audit_record(db)
     previous_hash = previous.record_hash if previous else GENESIS
     chain_sequence = (previous.chain_sequence + 1) if previous else 0

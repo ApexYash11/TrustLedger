@@ -22,7 +22,7 @@ from ..schemas import (
 )
 from ..services.hash_chain import verify_record_hash
 from ..services.replay import build_replay
-from ..services.sealer import build_snapshot, extract_evidence_and_policies, latest_audit_record, seal_record
+from ..services.sealer import extract_evidence_and_policies, latest_audit_record, seal_record
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
@@ -154,12 +154,6 @@ def complete_decision(task_id: str, payload: DecisionComplete, db: Session = Dep
             actor="agent",
         )
     )
-    db.flush()
-
-    task.completed_at = now
-
-    audit = seal_record(db, task, decision)
-
     db.add(
         DecisionEvent(
             task_id=task_id,
@@ -171,12 +165,10 @@ def complete_decision(task_id: str, payload: DecisionComplete, db: Session = Dep
     )
     db.flush()
 
-    # Snapshot must include the record_sealed event; rebuild and recompute hash.
-    final_snapshot = build_snapshot(db, task, decision)
-    from ..services.hash_chain import compute_record_hash
+    task.completed_at = now
 
-    audit.record_snapshot = final_snapshot
-    audit.record_hash = compute_record_hash(final_snapshot, audit.previous_hash)
+    # Seal last so the snapshot captures every event, including record_sealed.
+    audit = seal_record(db, task, decision)
 
     db.commit()
     return {

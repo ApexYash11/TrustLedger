@@ -210,7 +210,6 @@ def test_list_decisions_filters(agent_id):
     assert any(d["task_id"] == t1 for d in listing["decisions"])
 
     empty = client.get("/api/v1/decisions", params={"status": "queued"}).json()
-    assert all(d["status"] != "queued" or True for d in empty["decisions"])
     assert empty["total"] == 0
 
 

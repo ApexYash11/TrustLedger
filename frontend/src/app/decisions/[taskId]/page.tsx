@@ -18,8 +18,8 @@ export default function DecisionDetailPage() {
       .catch((e) => setError(e.message));
   }, [taskId]);
 
-  if (error) return <main style={{ padding: 32 }}>Failed to load decision: {error}</main>;
-  if (!record) return <main style={{ padding: 32 }}>Loading…</main>;
+  if (error) return <main className="p-8 text-red-600">Failed to load decision: {error}</main>;
+  if (!record) return <main className="p-8 text-slate-500">Loading…</main>;
 
   const task = record.task as { case_id?: string; case_type?: string; status?: string };
   const decision = record.decision as
@@ -27,50 +27,42 @@ export default function DecisionDetailPage() {
     | null;
 
   return (
-    <main style={{ padding: 24 }}>
-      <a href="/" style={{ color: "#2563eb", fontSize: 14 }}>
+    <main className="p-6 max-w-3xl mx-auto">
+      <a href="/" className="text-blue-600 text-sm hover:underline">
         ← Back to Command Center
       </a>
-      <h1 style={{ fontSize: 20, margin: "12px 0 4px" }}>{task.case_id}</h1>
-      <p style={{ color: "#64748b", marginBottom: 20 }}>
+      <h1 className="text-xl font-bold mt-3 mb-1">{task.case_id}</h1>
+      <p className="text-slate-500 mb-5">
         {task.case_type} · {task.status}
       </p>
 
-      <section
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          padding: 16,
-          boxShadow: "0 1px 2px rgba(0,0,0,.08)",
-          maxWidth: 720,
-        }}
-      >
-        <h2 style={{ fontSize: 14, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+      <section className="bg-white rounded-lg shadow-sm p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-2">
           Decision Overview
         </h2>
         {decision ? (
           <>
-            <p style={{ fontWeight: 600 }}>{decision.outcome?.replace(/_/g, " ")}</p>
-            <p style={{ color: "#475569" }}>{decision.outcome_summary}</p>
+            <p className="font-semibold">{decision.outcome?.replace(/_/g, " ")}</p>
+            <p className="text-slate-600">{decision.outcome_summary}</p>
           </>
         ) : (
-          <p style={{ color: "#94a3b8" }}>No decision recorded yet.</p>
+          <p className="text-slate-400">No decision recorded yet.</p>
         )}
 
-        <h2 style={{ fontSize: 14, textTransform: "uppercase", letterSpacing: 1, margin: "20px 0 8px" }}>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mt-5 mb-2">
           Decision Trail ({record.events.length} events)
         </h2>
-        <ol style={{ listStyle: "none" }}>
+        <ol>
           {record.events.map((e) => (
-            <li key={e.event_id} style={{ padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
-              <span style={{ color: "#94a3b8", fontSize: 12 }}>{e.timestamp}</span>{" "}
-              <span style={{ fontWeight: 600, fontSize: 14 }}>{e.summary}</span>
-              <span style={{ color: "#64748b", fontSize: 12 }}> — {e.actor}</span>
+            <li key={e.event_id} className="py-1.5 border-b border-slate-100">
+              <span className="text-slate-400 text-xs">{e.timestamp}</span>{" "}
+              <span className="font-semibold text-sm">{e.summary}</span>
+              <span className="text-slate-500 text-xs"> — {e.actor}</span>
             </li>
           ))}
         </ol>
 
-        <p style={{ marginTop: 20, fontSize: 13, color: "#94a3b8" }}>
+        <p className="mt-5 text-xs text-slate-400">
           Replay and Integrity tabs coming in Week 3.
         </p>
       </section>

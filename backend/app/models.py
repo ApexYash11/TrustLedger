@@ -2,8 +2,12 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .db import Base
+
+# Real JSONB on PostgreSQL (indexing/query operators per docs/02); generic JSON on SQLite for tests.
+JSONType = JSON().with_variant(JSONB, "postgresql")
 
 
 def new_uuid() -> str:
@@ -33,7 +37,7 @@ class Task(Base):
     agent_id = Column(String(36), ForeignKey("agents.agent_id"), nullable=False, index=True)
     status = Column(String(32), nullable=False, default="running", index=True)
     risk_level = Column(String(16), nullable=True)
-    inputs = Column(JSON, nullable=False)
+    inputs = Column(JSONType, nullable=False)
     human_review_status = Column(String(32), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     started_at = Column(DateTime(timezone=True), nullable=True)
@@ -50,7 +54,7 @@ class DecisionEvent(Base):
     event_type = Column(String(64), nullable=False)
     timestamp = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     summary = Column(String(1024), nullable=False)
-    details = Column(JSON, nullable=True)
+    details = Column(JSONType, nullable=True)
     actor = Column(String(32), nullable=False, default="agent")
 
 
@@ -61,8 +65,8 @@ class Decision(Base):
     task_id = Column(String(36), ForeignKey("tasks.task_id"), nullable=False, unique=True, index=True)
     outcome = Column(String(32), nullable=False)
     outcome_summary = Column(String(1024), nullable=False)
-    structured_rationale = Column(JSON, nullable=False)
-    alternatives_considered = Column(JSON, nullable=True)
+    structured_rationale = Column(JSONType, nullable=False)
+    alternatives_considered = Column(JSONType, nullable=True)
     confidence_score = Column(Float, nullable=True)
     decided_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -75,6 +79,6 @@ class AuditRecord(Base):
     task_id = Column(String(36), ForeignKey("tasks.task_id"), nullable=False, index=True)
     record_hash = Column(String(64), nullable=False)
     previous_hash = Column(String(64), nullable=False)
-    record_snapshot = Column(JSON, nullable=False)
+    record_snapshot = Column(JSONType, nullable=False)
     sealed_at = Column(DateTime(timezone=True), nullable=False)
     chain_sequence = Column(Integer, nullable=False)
