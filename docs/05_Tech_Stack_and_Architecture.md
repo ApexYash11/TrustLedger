@@ -228,7 +228,7 @@ FastAPI auto-generates OpenAPI spec at `http://localhost:8000/docs` — useful f
 
 ```env
 # Backend
-DATABASE_URL=postgresql://trustledger:trustledger@localhost:5432/trustledger
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/trustledger  # set via .env, never committed
 API_HOST=0.0.0.0
 API_PORT=8000
 
