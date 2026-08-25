@@ -22,6 +22,8 @@ The agent decides. TrustLedger records and verifies.
 | [docs/06_Demo_Showcase_Flow.md](docs/06_Demo_Showcase_Flow.md) | 3–5 minute evaluator demo script |
 | [docs/07_Weekly_Roadmap.md](docs/07_Weekly_Roadmap.md) | 4-week plan to second week of September |
 | [docs/08_Scope_and_Non_Goals.md](docs/08_Scope_and_Non_Goals.md) | What we will and will not build |
+| [docs/09_HLD.md](docs/09_HLD.md) | High-level design with diagrams |
+| [docs/10_Current_Status.md](docs/10_Current_Status.md) | Implementation status and evidence |
 | [docs/README.md](docs/README.md) | Full project overview |
 
 Source of truth for the problem statement: `TrustLedger_EOI_Enhanced.pptx`
@@ -30,8 +32,8 @@ Source of truth for the problem statement: `TrustLedger_EOI_Enhanced.pptx`
 
 ## Status
 
-Documentation complete. Implementation has not started.
+Phase 1 implemented and tested on branch `yash` (PR #1): full logging API, SHA-256 hash chain with tamper detection (12/12 tests), Kanban dashboard scaffold with Tailwind. See `docs/10_Current_Status.md`.
 
 **Target demo:** second week of September 2026.
 
-See `docs/README.md` for architecture, how to run (planned), and limitations.
+See `docs/README.md` for architecture, how to run, and limitations.

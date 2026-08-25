@@ -117,10 +117,12 @@ TrustLedger/
 │   ├── 05_Tech_Stack_and_Architecture.md
 │   ├── 06_Demo_Showcase_Flow.md
 │   ├── 07_Weekly_Roadmap.md
-│   └── 08_Scope_and_Non_Goals.md
+│   ├── 08_Scope_and_Non_Goals.md
+│   ├── 09_HLD.md
+│   └── 10_Current_Status.md
 ├── TrustLedger_EOI_Enhanced.pptx  Deloitte Capstone EOI (source of truth)
-├── backend/                       (to be implemented)
-├── frontend/                      (to be implemented)
+├── backend/                       FastAPI app — implemented, tested (12/12 passing)
+├── frontend/                      Next.js dashboard — scaffold implemented
 └── README.md
 ```
 
@@ -128,34 +130,38 @@ TrustLedger/
 
 ## How to Run Locally
 
-Implementation is not started yet. Planned flow:
+Backend runs standalone on SQLite; the full stack uses Docker Compose + PostgreSQL.
 
 ```bash
-# Start PostgreSQL
-docker compose up postgres -d
-
-# Backend
+# Backend (no Docker needed)
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
-# Seed demo data
-python -m seed.load_demo_data
+# Run tests
+cd backend && python -m pytest tests -q
 
 # Frontend
 cd frontend
 npm install
 npm run dev
+
+# Full stack with PostgreSQL (requires Docker)
+cp .env.example .env   # set POSTGRES_PASSWORD
+docker compose up --build
 ```
 
 Dashboard: `http://localhost:3000`  
 API docs: `http://localhost:8000/docs`
 
+Seed demo data: `python -m seed.load_demo_data` (coming with the simulated agent, Week 2)
+
 ---
 
 ## Current Prototype Limitations
 
-- Documentation and product design only — no running application yet
+- Backend implemented and tested; simulated agent and seed data still pending (Week 2)
+- Replay and Integrity UI tabs not yet built (Weeks 3–4)
 - No authentication or RBAC
 - Hash chain on standard PostgreSQL, not WORM/HSM storage
 - One domain, one simulated agent, synthetic data
