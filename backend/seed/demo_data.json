@@ -1,0 +1,423 @@
+{
+  "agent": {
+    "name": "ResearchAgent",
+    "version": "1.2.0",
+    "domain": "deloitte_client_research",
+    "description": "Simulated Deloitte client research agent"
+  },
+  "scenarios": [
+    {
+      "case_id": "RES-2026-004821",
+      "case_type": "Market Entry Assessment — EV Charging",
+      "status_target": "review_required",
+      "risk_level": "high",
+      "inputs": {
+        "client_name": "Tata Power",
+        "engagement_code": "ENG-2026-TP-018",
+        "research_question": "Should Tata Power enter the commercial EV fast-charging market in Rajasthan in FY27?",
+        "review_deadline": "2026-08-28"
+      },
+      "events": [
+        {
+          "event_type": "data_retrieved",
+          "summary": "Client strategy documents and 3-year financials retrieved",
+          "actor": "agent",
+          "details": { "engagement_status": "active", "prior_studies": 1 }
+        },
+        {
+          "event_type": "policy_retrieved",
+          "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
+          "actor": "agent"
+        },
+        {
+          "event_type": "clause_identified",
+          "summary": "Methodology Section 5.3 — Market Entry Evidence Thresholds identified as binding",
+          "actor": "agent",
+          "policy_reference": {
+            "policy_id": "pol-ref-001",
+            "policy_code": "DEL-RM-2026",
+            "section": "Section 5.3",
+            "title": "Market Entry Evidence Thresholds",
+            "text_excerpt": "A market entry recommendation requires three independent demand-side sources and a validated competitor cost baseline; otherwise the engagement must be escalated for partner review.",
+            "application": "Three demand-side sources are available, but the competitor cost baseline has conflicting figures — full-scale entry cannot be recommended yet."
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "State EV policy and tariff data evaluated — charging margins viable",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-001",
+            "evidence_type": "database_record",
+            "title": "Rajasthan EV Policy 2024 and Tariff Orders",
+            "source": "State Electricity Regulatory Commission Portal",
+            "content_summary": "Per-kWh charging tariff capped at ₹1.10; charging stations classified as a licensed activity with simplified approvals.",
+            "relevance": "Establishes the regulatory cost base for the charging-margin model"
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Third-party market outlook evaluated — 34% CAGR forecast",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-002",
+            "evidence_type": "third_party_report",
+            "title": "EV Charging Infrastructure Outlook 2026",
+            "source": "BloombergNEF (licensed)",
+            "content_summary": "Forecasts 34% CAGR for commercial fast-charging demand in western India through FY30; utilisation is the dominant profitability driver.",
+            "relevance": "Primary demand-side source for the pilot-scale estimate"
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Competitor cost baseline reviewed — conflicting figures found",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-003",
+            "evidence_type": "document",
+            "title": "Competitor Benchmark Set (4 operators)",
+            "source": "Client Data Room",
+            "content_summary": "Per-kWh prices across the four benchmarked operators vary by 22% between the two compiled sources; two figures could not be reconciled.",
+            "relevance": "Competitor cost baseline fails the Section 5.3 validation threshold"
+          }
+        }
+      ],
+      "decision": {
+        "outcome": "recommended_with_caveats",
+        "outcome_summary": "Conditional recommendation: enter via a phased pilot in the Jaipur–Udaipur corridor. Demand-side evidence supports pilot scale, but the competitor cost baseline is contested — full-scale entry is deferred pending verification (Methodology Section 5.3).",
+        "structured_rationale": {
+          "primary_reason": "Demand-side sources triangulate to a viable pilot scale and the regulatory cost base is favourable, but the competitor cost baseline fails the validation threshold in Section 5.3, so a full-scale entry recommendation cannot be defended yet.",
+          "supporting_factors": [
+            "Three independent demand-side sources agree on pilot-scale volumes",
+            "State tariff cap and simplified licensing improve unit economics",
+            "Competitor price figures vary by 22% across sources and remain unreconciled"
+          ],
+          "policy_basis": ["pol-ref-001"],
+          "evidence_basis": ["ev-001", "ev-002", "ev-003"],
+          "exclusions_applied": [
+            "Section 5.3: Full-scale entry deferred — competitor cost baseline unverified"
+          ]
+        },
+        "alternatives_considered": [
+          { "outcome": "recommended", "reason_rejected": "Recommending full-scale entry on an unverified cost baseline breaches Section 5.3" },
+          { "outcome": "not_recommended", "reason_rejected": "Demand-side evidence is strong; declining the pilot ignores a validated opportunity" }
+        ],
+        "confidence_score": 0.81
+      },
+      "requires_human_review": true
+    },
+    {
+      "case_id": "RES-2026-009999",
+      "case_type": "Vendor Due Diligence — Automation Partner",
+      "status_target": "tampered_completed",
+      "risk_level": "medium",
+      "inputs": {
+        "client_name": "Adani Logistics",
+        "engagement_code": "ENG-2026-AL-007",
+        "research_question": "Is Velm Robotics a viable automation partner for the Bhiwandi fulfilment centre?",
+        "review_deadline": "2026-08-21"
+      },
+      "events": [
+        {
+          "event_type": "data_retrieved",
+          "summary": "Vendor registry and financials retrieved",
+          "actor": "agent",
+          "details": { "engagement_status": "active", "prior_studies": 0 }
+        },
+        {
+          "event_type": "policy_retrieved",
+          "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
+          "actor": "agent"
+        },
+        {
+          "event_type": "clause_identified",
+          "summary": "Methodology Section 6.1 — Red-Flag Escalation identified as binding",
+          "actor": "agent",
+          "policy_reference": {
+            "policy_id": "pol-ref-101",
+            "policy_code": "DEL-RM-2026",
+            "section": "Section 6.1",
+            "title": "Red-Flag Escalation",
+            "text_excerpt": "A vendor exhibiting two or more diligence red flags (litigation history, financial distress, unverifiable references, sanction exposure, IP disputes) must be rated conditional and routed for partner sign-off.",
+            "application": "Vendor exhibits 2 of 5 red flags — conditional rating and partner sign-off are required before contract award."
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Litigation database check reviewed — two pending disputes",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-101",
+            "evidence_type": "database_record",
+            "title": "Court Records Search — Velm Robotics",
+            "source": "Legal Intelligence Database",
+            "content_summary": "Two pending commercial disputes filed 2025–2026, both relating to delayed system deliveries.",
+            "relevance": "Counts toward the Section 6.1 red-flag threshold"
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Audited financials reviewed — receivables ageing doubled",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-102",
+            "evidence_type": "document",
+            "title": "Velm Robotics FY25 Financial Statements",
+            "source": "Vendor Data Room",
+            "content_summary": "Revenue growth of 41%, but receivables ageing doubled year-over-year and the auditor flagged going-concern assumptions.",
+            "relevance": "Financial-distress indicator counting toward the red-flag threshold"
+          }
+        }
+      ],
+      "decision": {
+        "outcome": "recommended_with_caveats",
+        "outcome_summary": "Recommendation: proceed with caveats — 2 of 5 diligence red flags unresolved; partner sign-off required before contract award.",
+        "structured_rationale": {
+          "primary_reason": "Two red flags (litigation history, financial-distress indicators) are open under Section 6.1, so the vendor is rated conditional and the recommendation cannot be issued without partner sign-off.",
+          "supporting_factors": [
+            "Two pending commercial disputes in public court records",
+            "Receivables ageing doubled year-over-year with a going-concern note",
+            "Technical capability scores from the evaluation team remain strong"
+          ],
+          "policy_basis": ["pol-ref-101"],
+          "evidence_basis": ["ev-101", "ev-102"],
+          "exclusions_applied": [
+            "Section 6.1: Partner sign-off required — 2 red flags open"
+          ]
+        },
+        "alternatives_considered": [],
+        "confidence_score": 0.78
+      },
+      "requires_human_review": false
+    },
+    {
+      "case_id": "RES-2026-006122",
+      "case_type": "Market Sizing Study — Agri-Drone Exports",
+      "status_target": "completed",
+      "risk_level": "medium",
+      "inputs": {
+        "client_name": "AgriNova International",
+        "engagement_code": "ENG-2026-AN-003",
+        "research_question": "What is the addressable export market for agricultural spraying drones in Southeast Asia?",
+        "review_deadline": "2026-08-19"
+      },
+      "events": [
+        {
+          "event_type": "data_retrieved",
+          "summary": "Client brief and engagement scope retrieved",
+          "actor": "agent",
+          "details": { "engagement_status": "active", "prior_studies": 0 }
+        },
+        {
+          "event_type": "policy_retrieved",
+          "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
+          "actor": "agent"
+        },
+        {
+          "event_type": "clause_identified",
+          "summary": "Methodology Section 1.2 — Independence and Conflicts Restriction identified as binding",
+          "actor": "agent",
+          "policy_reference": {
+            "policy_id": "pol-ref-201",
+            "policy_code": "DEL-RM-2026",
+            "section": "Section 1.2",
+            "title": "Independence and Conflicts Restriction",
+            "text_excerpt": "Advisory work for a client whose direct competitor is an existing audit client of the firm is prohibited without an approved independence waiver.",
+            "application": "The market leader in the target segment is an existing audit client of the firm — no waiver is on file."
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Conflict register extract reviewed — audit-client overlap confirmed",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-201",
+            "evidence_type": "database_record",
+            "title": "Firm Conflict Register Extract",
+            "source": "Independence & Conflicts System",
+            "content_summary": "AgriNova's largest regional competitor has been an audit client of the firm since FY23; no independence waiver is recorded for advisory work in the same market segment.",
+            "relevance": "Directly triggers the Section 1.2 independence restriction"
+          }
+        }
+      ],
+      "decision": {
+        "outcome": "not_recommended",
+        "outcome_summary": "Not recommended: engagement declined — Section 1.2 independence restriction applies because the segment leader is an existing audit client of the firm and no waiver is on file.",
+        "structured_rationale": {
+          "primary_reason": "Advising AgriNova in a segment where the firm audits a direct competitor is prohibited by Section 1.2 without an approved independence waiver, and no waiver exists — any deliverable would create a firm-level independence breach.",
+          "supporting_factors": [
+            "Conflict register confirms an active audit relationship with the segment leader",
+            "No independence waiver is on file for this market segment",
+            "Scope reduction would not cure the conflict because the overlap is client-level"
+          ],
+          "policy_basis": ["pol-ref-201"],
+          "evidence_basis": ["ev-201"],
+          "exclusions_applied": [
+            "Section 1.2: Engagement declined — independence conflict with existing audit client"
+          ]
+        },
+        "alternatives_considered": [
+          { "outcome": "recommended", "reason_rejected": "A reduced-scope study does not cure a client-level independence conflict" }
+        ],
+        "confidence_score": 0.96
+      },
+      "requires_human_review": false
+    },
+    {
+      "case_id": "RES-2026-005177",
+      "case_type": "Pricing Benchmark Study — D2C Personal Care",
+      "status_target": "completed",
+      "risk_level": "low",
+      "inputs": {
+        "client_name": "GlowRoot Naturals",
+        "engagement_code": "ENG-2026-GN-011",
+        "research_question": "What launch price band should GlowRoot use for its new face-serum line in modern trade?",
+        "review_deadline": "2026-08-25"
+      },
+      "events": [
+        {
+          "event_type": "data_retrieved",
+          "summary": "Client category data and historical pricing retrieved",
+          "actor": "agent",
+          "details": { "engagement_status": "active", "prior_studies": 2 }
+        },
+        {
+          "event_type": "policy_retrieved",
+          "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
+          "actor": "agent"
+        },
+        {
+          "event_type": "clause_identified",
+          "summary": "Methodology Section 3.4 — Secondary Source Triangulation identified as satisfied",
+          "actor": "agent",
+          "policy_reference": {
+            "policy_id": "pol-ref-301",
+            "policy_code": "DEL-RM-2026",
+            "section": "Section 3.4",
+            "title": "Secondary Source Triangulation",
+            "text_excerpt": "Pricing recommendations must triangulate at least two independent retail-audit panels and reconcile any variance above 8% before publication.",
+            "application": "Three retail audit panels agree within a 4% variance band — the triangulation threshold is met."
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Retail audit dataset evaluated — panels agree within 4%",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-301",
+            "evidence_type": "third_party_report",
+            "title": "Retail Audit Dataset — Q2 FY26 Personal Care",
+            "source": "NielsenIQ (licensed)",
+            "content_summary": "Panel data across modern trade shows the ₹349–₹399 band captures 62% of premium face-serum volume; inter-panel variance is under 4%.",
+            "relevance": "Establishes the recommended price band within the Section 3.4 variance threshold"
+          }
+        }
+      ],
+      "decision": {
+        "outcome": "recommended",
+        "outcome_summary": "Recommended: launch price band of ₹349–₹399 validated across three retail audit panels within a 4% variance.",
+        "structured_rationale": {
+          "primary_reason": "Three independent retail audit panels triangulate within the 4% variance allowed by Section 3.4, and the ₹349–₹399 band covers the majority of premium volume, so the pricing recommendation is fully defensible.",
+          "supporting_factors": [
+            "All three audit panels agree within a 4% variance band",
+            "Band covers 62% of premium face-serum volume in modern trade",
+            "Client cost structure supports a 58% gross margin at the midpoint"
+          ],
+          "policy_basis": ["pol-ref-301"],
+          "evidence_basis": ["ev-301"],
+          "exclusions_applied": []
+        },
+        "alternatives_considered": [],
+        "confidence_score": 0.98
+      },
+      "requires_human_review": false
+    },
+    {
+      "case_id": "RES-2026-005204",
+      "case_type": "M&A Screening — EV Mobility Target",
+      "status_target": "completed",
+      "risk_level": "high",
+      "inputs": {
+        "client_name": "BlueOrbit Capital",
+        "engagement_code": "ENG-2026-BO-002",
+        "research_question": "Is Voltaic Mobility a viable acquisition target for BlueOrbit Fund III?",
+        "review_deadline": "2026-08-27"
+      },
+      "events": [
+        {
+          "event_type": "data_retrieved",
+          "summary": "Target data pack and 2-year screening history retrieved",
+          "actor": "agent",
+          "details": { "engagement_status": "active", "prior_studies": 2 }
+        },
+        {
+          "event_type": "policy_retrieved",
+          "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
+          "actor": "agent"
+        },
+        {
+          "event_type": "clause_identified",
+          "summary": "Methodology Section 8.4 — Deal-Stopping Findings identified as binding",
+          "actor": "agent",
+          "policy_reference": {
+            "policy_id": "pol-ref-401",
+            "policy_code": "DEL-RM-2026",
+            "section": "Section 8.4",
+            "title": "Deal-Stopping Findings",
+            "text_excerpt": "Screening must be withheld and the finding routed to Deal Risk Advisory where an undisclosed regulatory investigation, sanction exposure, or governance irregularity is identified.",
+            "application": "An undisclosed consumer-protection investigation plus governance irregularities meet the deal-stopping criteria — screening is withheld pending risk review."
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Data room legal folder reviewed — undisclosed regulatory investigation found",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-401",
+            "evidence_type": "document",
+            "title": "Data Room — Legal Correspondence Folder",
+            "source": "Client Data Room",
+            "content_summary": "Correspondence shows an open consumer-protection authority investigation into battery certification claims, referenced in an NDA annex but absent from the disclosure schedule.",
+            "relevance": "Undisclosed regulatory investigation — a deal-stopping finding under Section 8.4"
+          }
+        },
+        {
+          "event_type": "evidence_evaluated",
+          "summary": "Corporate registry check reviewed — governance irregularities noted",
+          "actor": "agent",
+          "evidence": {
+            "evidence_id": "ev-402",
+            "evidence_type": "database_record",
+            "title": "Registrar of Companies Filings — Voltaic Mobility",
+            "source": "Ministry of Corporate Affairs Portal",
+            "content_summary": "Two director resignations within 90 days and a declined statutory auditor re-appointment; filings show conflicting registered office addresses.",
+            "relevance": "Governance irregularities corroborate the deal-stopping assessment"
+          }
+        }
+      ],
+      "decision": {
+        "outcome": "escalated",
+        "outcome_summary": "Escalated to Deal Risk Advisory: an undisclosed regulatory investigation and governance irregularities meet the deal-stopping criteria in Section 8.4 — screening is withheld pending risk review.",
+        "structured_rationale": {
+          "primary_reason": "An undisclosed consumer-protection investigation, corroborated by registrar filings showing governance irregularities, satisfies the deal-stopping criteria in Section 8.4 — the screening recommendation is withheld and the finding routed to Deal Risk Advisory.",
+          "supporting_factors": [
+            "Investigation referenced in an NDA annex but absent from the disclosure schedule",
+            "Two director resignations within 90 days; auditor re-appointment declined",
+            "Deal value of ₹420 crore elevates the materiality of any undisclosed liability"
+          ],
+          "policy_basis": ["pol-ref-401"],
+          "evidence_basis": ["ev-401", "ev-402"],
+          "exclusions_applied": [
+            "Section 8.4: Screening withheld pending Deal Risk Advisory review"
+          ]
+        },
+        "alternatives_considered": [
+          { "outcome": "recommended", "reason_rejected": "Proceeding on an undisclosed investigation creates firm and client liability" },
+          { "outcome": "not_recommended", "reason_rejected": "Investigation is not yet conclusive — premature rejection forecloses a potentially viable deal" }
+        ],
+        "confidence_score": 0.74
+      },
+      "requires_human_review": false
+    }
+  ]
+}

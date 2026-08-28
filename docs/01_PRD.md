@@ -12,7 +12,7 @@
 
 TrustLedger does **not** make business decisions. It **observes, records, structures, and verifies** the decision process so that compliance officers, auditors, and legal reviewers can understand, reconstruct, and defend AI-driven outcomes — without data-science expertise.
 
-For the prototype, TrustLedger demonstrates this capability through a web-based **Agent Command Center** (Kanban dashboard) backed by a logging API, hash-chained audit store, and decision replay — using a simulated insurance claims agent and synthetic data.
+For the prototype, TrustLedger demonstrates this capability through a web-based **Agent Command Center** (Kanban dashboard) backed by a logging API, hash-chained audit store, and decision replay — using a simulated research agent and synthetic data.
 
 ---
 
@@ -20,7 +20,7 @@ For the prototype, TrustLedger demonstrates this capability through a web-based 
 
 ### What is happening today?
 
-AI agents increasingly make high-stakes decisions: approving or denying insurance claims, loan applications, medical prior authorizations, hiring recommendations, and government benefit determinations. These decisions affect real people and carry regulatory weight.
+AI agents increasingly make high-stakes recommendations: whether a client should enter a market, partner with a vendor, acquire a target, or how to price a product. These recommendations land in signed deliverables and carry professional-standards and client significance.
 
 Yet when a decision is questioned, organizations face a critical gap: **no standardized record exists that explains what data drove the decision and what alternatives were considered.** Investigation requires manually piecing together application logs, database queries, model outputs, and email threads — a process that takes days and produces inconsistent results.
 
@@ -48,7 +48,7 @@ Yet when a decision is questioned, organizations face a critical gap: **no stand
 - **Slow, costly manual dispute reconstruction** (multi-day investigations per case)
 - **No standard record format** across business units
 - **AI confined to low-stakes work** — only ~11% of orgs have agents in production vs. ~38% piloting; trust gaps are a primary blocker
-- Emerging rules (adverse-action disclosure, claims-denial rationale) remain unaddressed
+- Emerging rules (professional standards, disclosure obligations) remain unaddressed
 
 *Aligned with Deloitte EOI problem statement.*
 
@@ -93,7 +93,7 @@ Yet when a decision is questioned, organizations face a critical gap: **no stand
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  1. Agent executes claim review (simulated)                           │
+│  1. Agent executes research engagement (simulated)                  │
 │  2. TrustLedger captures decision events live via Logging API           │
 │  3. Decision record created and hash-chained                            │
 │  4. Task appears on Agent Command Center (Kanban)                       │
@@ -131,7 +131,7 @@ Yet when a decision is questioned, organizations face a critical gap: **no stand
 | FR-7 | Decision detail page: overview, evidence, policies, trail, replay, integrity |
 | FR-8 | Decision Trail: chronological visual timeline of decision events |
 | FR-9 | Decision Replay: step-by-step reconstruction from stored record |
-| FR-10 | Simulated insurance claims agent that logs to TrustLedger |
+| FR-10 | Simulated research agent that logs to TrustLedger |
 | FR-11 | Pre-seeded synthetic demo dataset (10–20 records across all statuses) |
 | FR-12 | Do NOT store or display LLM chain-of-thought; use structured rationale only |
 
@@ -163,7 +163,7 @@ Aligned with EOI target metrics, adapted for prototype demonstration:
 
 | KPI | Target | How measured in prototype |
 |-----|--------|--------------------------|
-| **Decision reconstruction time** | < 2 minutes | Timed demo: open disputed claim → full replay in under 2 min |
+| **Decision reconstruction time** | < 2 minutes | Timed demo: open disputed engagement → full replay in under 2 min |
 | **Tamper-evidence** | 100% of sealed records verifiable | Integrity check returns pass for all seed data; fail demo on tampered record |
 | **User comprehension** | ≥ 90% compliance staff understand record without DS help | Informal test with 1–2 non-technical reviewers during Week 4 |
 | **Investigation effort reduction** | Multi-day → minutes (qualitative) | Demo narrative: "This used to take 3 days of manual log reconstruction" |
@@ -176,7 +176,7 @@ Do not claim production ROI figures in the prototype demo unless clearly labeled
 
 The prototype MVP is **complete** when all of the following are true:
 
-- [ ] Simulated insurance claims agent creates decisions via TrustLedger API
+- [ ] Simulated research agent creates decisions via TrustLedger API
 - [ ] At least 10 pre-seeded decision records visible on Kanban dashboard
 - [ ] User can click any task and see full decision detail
 - [ ] Decision Trail shows chronological events with evidence and policy links
@@ -194,7 +194,7 @@ The prototype MVP is **complete** when all of the following are true:
 |----------|-----------|
 | Kanban Agent Command Center as primary UI | Operational visibility inspired by agent orchestration tools; audit layer remains core product |
 | 4-week timeline (not 12-week EOI plan) | Team deadline: second week of September 2026 |
-| Insurance claims only (not lending) | EOI allows either; claims maps well to denial-rationale regulations |
+| Deloitte client research only (not lending) | EOI allowed insurance/lending; client research resonates with a capstone audience and still exercises every audit feature |
 | PostgreSQL-only search (no OpenSearch) | Sufficient for demo scale; reduces infra complexity |
 | Single-page detail with tabs | Faster to build than multi-page flow in 4 weeks |
 

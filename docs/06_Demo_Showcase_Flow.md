@@ -8,7 +8,7 @@
 
 ## Demo Narrative Arc
 
-**Setup:** "Imagine you're a compliance officer at an insurance company. AI agents are processing hundreds of claims daily. A customer disputes a partial approval. Today, this takes days to investigate. With TrustLedger, it takes two minutes."
+**Setup:** "Imagine you're a partner at Deloitte's Quality & Risk Management (QRM) function. AI research agents are drafting market-entry and due-diligence studies for our clients. A client disputes a recommendation of 'enter with caveats'. Today, defending that call takes days — pulling working papers and reconstructing what the research agent did. With TrustLedger, it takes two minutes."
 
 ---
 
@@ -17,9 +17,9 @@
 - [ ] Backend running with seeded data (15+ records across all Kanban columns)
 - [ ] Frontend loaded at `http://localhost:3000`
 - [ ] All seed records pass integrity verification
-- [ ] One tampered record pre-seeded (CLM-2026-009999) for contrast demo
+- [ ] One tampered record pre-seeded (RES-2026-009999) for contrast demo
 - [ ] Browser zoom at 100%, no unrelated tabs open
-- [ ] Demo claim (CLM-2026-004821) is in **Review Required** column
+- [ ] Demo engagement (RES-2026-004821) is in **Review Required** column
 
 ---
 
@@ -32,7 +32,7 @@
 **Action:** Open TrustLedger dashboard. Point to Kanban columns.
 
 **Say:**
-> "This is TrustLedger's Agent Command Center — where we see what our AI agents are currently doing. We have claims moving through four stages: queued, running, review required, and completed. TrustLedger doesn't make decisions — it records and verifies them."
+> "This is TrustLedger's Research Command Center — where we see what our AI research agents are currently doing. We have client research engagements moving through four stages: queued, running, review required, and completed. TrustLedger doesn't make recommendations — it records and verifies them."
 
 **Point out:**
 - Multiple tasks across columns (shows system is active)
@@ -45,17 +45,17 @@
 
 ### Step 2 — Open a High-Risk Task (20 seconds)
 
-**Screen:** Click task card `CLM-2026-004821` in **Review Required**
+**Screen:** Click task card `RES-2026-004821` in **Review Required**
 
-**Action:** Click the high-risk partial approval claim.
+**Action:** Click the high-risk engagement card.
 
 **Say:**
-> "Let's look at this one — a property damage claim flagged for review. The agent recommended a partial approval: $12,400 of $18,000. A customer or regulator might ask: why wasn't the full amount approved?"
+> "Let's look at this one — a market-entry assessment for Tata Power, flagged for partner review. The agent put forward a conditional recommendation: enter via a phased pilot, not full scale. A partner or the client might ask: why was full-scale entry held back?"
 
 **Point out:**
 - Status: Review Required
 - Risk: High
-- Human review was triggered because it's a high-value partial approval
+- Human review was triggered because the recommendation meets a methodology escalation threshold (Section 5.3)
 
 ---
 
@@ -66,12 +66,12 @@
 **Action:** Walk through the summary sections top to bottom.
 
 **Say:**
-> "Here's the decision at a glance. Partial approval — $12,400 approved, $5,600 excluded. The primary reason is right here in plain language: contents damage is covered, but structural flooring damage is excluded because the flooding was from external rainfall, not a pipe burst."
+> "Here's the recommendation at a glance. Conditional — enter via a phased pilot in the Jaipur–Udaipur corridor. The primary reason is right here in plain language: demand-side evidence supports pilot scale, but the competitor cost baseline is contested, so full-scale entry fails the methodology's validation threshold."
 
 **Point out:**
-- Decision outcome badge (Partial Approval)
-- Structured rationale — readable by a compliance officer, no ML jargon
-- Case inputs: claimant, amount, incident description
+- Decision/Recommendation outcome badge (Recommended with Caveats)
+- Structured rationale — readable by a QRM/partner, no ML jargon
+- Engagement inputs: client, research question, review deadline
 - Evidence used: 3 items
 - Policies referenced: 2 sections
 
@@ -90,12 +90,12 @@
 
 **Pause at key events:**
 
-1. **Case Received** — "The claim entered the system."
-2. **Policy Retrieved** — "The agent pulled the customer's policy."
-3. **Clause Identified** — "It found Section 4.2.1 — the water damage exclusion. You can see the actual policy text right here."
-4. **Evidence Evaluated** — "It reviewed the adjuster report, photos, and weather data. Each piece of evidence is linked."
-5. **Decision Generated** — "Based on all of this, the agent recommended partial approval."
-6. **Human Review Triggered** — "Because this is a high-value partial approval, it was flagged for human review."
+1. **Case Received** — "The research engagement entered the system."
+2. **Methodology Loaded** — "The agent loaded the firm's research methodology (DEL-RM-2026)."
+3. **Applicable Standard Identified** — "It flagged Section 5.3 — Market Entry Evidence Thresholds. You can see the exact methodology text right here."
+4. **Source Evaluated** — "It reviewed the state EV tariff data, the third-party outlook, and the competitor benchmark set. Each source is linked."
+5. **Recommendation Generated** — "Based on all of this, the agent recommended entering with caveats."
+6. **Human Review Triggered** — "Because the cost baseline fails the validation threshold, it was routed for partner review."
 7. **Record Sealed** — "The record was sealed and locked into the audit chain."
 
 **Say:**
@@ -110,12 +110,12 @@
 **Action:** Expand one evidence item and one policy reference.
 
 **Say:**
-> "The adjuster report noted no pipe damage — consistent with external flooding. The weather data confirms 62 millimeters of rainfall on the incident date. And here's the exact policy clause that was applied — Section 4.2.1 excludes external flood damage, but Section 3.1 separately covers contents."
+> "The state tariff cap confirms viable charging margins, the licensed third-party outlook forecasts 34% CAGR, and the competitor benchmark set shows a 22% variance between sources. And here's the exact methodology clause that was applied — Section 5.3 requires a validated competitor cost baseline before full-scale entry can be recommended."
 
 **Point out:**
 - Evidence is summarized in plain language (not raw documents)
-- Policy text is quoted directly (auditable)
-- Application field explains HOW the policy was applied to THIS case
+- Methodology text is quoted directly (auditable)
+- Application field explains HOW the methodology was applied to THIS engagement
 
 ---
 
@@ -158,7 +158,7 @@
 **Optional — Tamper contrast (if time):**
 > "And here's what happens if someone tries to alter a record after the fact."
 
-Navigate to tampered record `CLM-2026-009999` → Integrity tab shows red "Verification Failed."
+Navigate to tampered record `RES-2026-009999` → Integrity tab shows red "Verification Failed."
 
 ---
 
@@ -169,7 +169,7 @@ Navigate to tampered record `CLM-2026-009999` → Integrity tab shows red "Verif
 **Say:**
 > "So what's the business value? Today, investigating a disputed AI decision takes days — manually pulling logs, interviewing engineers, reconstructing what happened. TrustLedger reduces that to a two-minute lookup: open the case, read the trail, replay the decision, verify the record hasn't been tampered with."
 
-> "The same schema works across insurance, banking, healthcare, and government — only the policy references change. TrustLedger wraps around existing agents via a simple API — five endpoints, no agent rebuild required."
+> "The same schema works across every service line — consulting, financial advisory, tax — only the methodology references change. TrustLedger wraps around existing agents via a simple API — five endpoints, no agent rebuild required."
 
 > "We're not building another monitoring dashboard. We're building the trust layer that lets organizations deploy AI agents in high-stakes workflows with confidence."
 
@@ -199,12 +199,12 @@ The seed data must include:
 
 | Record | Status | Risk | Purpose in demo |
 |--------|--------|------|-----------------|
-| CLM-2026-004821 | review_required | high | **Primary demo claim** — partial approval |
-| CLM-2026-004822 | completed | low | Shows a clean approval |
-| CLM-2026-004823 | completed | medium | Shows a denial |
-| CLM-2026-004824 | running | — | Shows live agent activity |
-| CLM-2026-004825 | queued | — | Shows pipeline |
-| CLM-2026-009999 | completed | high | **Tampered record** — integrity fail demo |
+| RES-2026-004821 | review_required | high | **Primary demo engagement** — conditional recommendation (Tata Power EV study) |
+| RES-2026-005177 | completed | low | Shows a clean approval |
+| RES-2026-006122 | completed | medium | Shows a denial |
+| RES-2026-005701 | running | — | Shows live agent activity |
+| RES-2026-005801 | queued | — | Shows pipeline |
+| RES-2026-009999 | completed | high | **Tampered record** — integrity fail demo |
 | + 9 more | various | various | Fill Kanban columns realistically |
 
 ---
@@ -214,7 +214,7 @@ The seed data must include:
 | Problem | Fallback |
 |---------|----------|
 | Backend not running | Pre-loaded static JSON in frontend (read-only demo mode) |
-| Integrity check fails on primary record | Use CLM-2026-004822 (known-good) instead |
+| Integrity check fails on primary record | Use RES-2026-005177 (known-good) instead |
 | Agent not generating live tasks | All tasks pre-seeded; mention "in production, these appear live" |
 | Projector resolution too low | Zoom browser to 125%; collapse sidebar |
 | Question about LLM internals | "TrustLedger captures the decision record, not model internals — that's by design for compliance readability" |

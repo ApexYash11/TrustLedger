@@ -63,7 +63,7 @@ FastAPI serves:
 
 | Factor | Decision |
 |--------|----------|
-| Primary | Scripted Python agent (`agents/claims_agent.py`) calling TrustLedger API |
+| Primary | Scripted Python agent (`agents/research_agent.py`) calling TrustLedger API |
 | Optional | LLM API (OpenAI/Anthropic) for rationale generation — pay-per-use, EOI's one licensed component |
 | Why scripted first | Demo reliability — no API rate limits, no latency surprises during presentation |
 
@@ -109,7 +109,7 @@ flowchart TB
     end
 
     subgraph AgentLayer["Agent Layer"]
-        SimAgent["Simulated Claims Agent<br/>(Python)"]
+        SimAgent["Simulated Research Agent<br/>(Python)"]
     end
 
     subgraph Storage["Storage"]
@@ -187,7 +187,7 @@ TrustLedger/
 │   │   │   └── sealer.py          # Record sealing
 │   │   └── db.py                  # Database connection
 │   ├── agents/
-│   │   └── claims_agent.py        # Simulated agent
+│   │   └── research_agent.py        # Simulated agent
 │   ├── seed/
 │   │   └── demo_data.json         # Pre-built decision records
 │   ├── tests/
@@ -262,7 +262,7 @@ npm run dev
 
 # 5. (Optional) Run simulated agent
 cd backend
-python -m agents.claims_agent
+python -m agents.research_agent
 ```
 
 ---
@@ -283,7 +283,7 @@ python -m agents.claims_agent
 | Concern | Prototype | Production (future) |
 |---------|-----------|-------------------|
 | Authentication | None | API keys + OAuth |
-| Authorization | None | RBAC (auditor sees claims only) |
+| Authorization | None | RBAC (analyst/partner sees engagements they own) |
 | Encryption at rest | PostgreSQL default | AES-256 + KMS |
 | Encryption in transit | HTTP localhost | TLS everywhere |
 | PII | Synthetic data only | Redaction pipeline |

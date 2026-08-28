@@ -43,7 +43,7 @@ Operational entry point showing all agent tasks grouped by status. Inspired by a
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  TrustLedger                                    ClaimsReviewAgent ● Active │
+│  TrustLedger                                    ResearchAgent ● Active │
 │  Agent Command Center                                                    │
 ├──────────┬──────────┬────────────────┬─────────────────────────────────┤
 │  QUEUED  │ RUNNING  │ REVIEW REQUIRED│  COMPLETED                      │
@@ -67,9 +67,9 @@ Keep cards minimal — only what helps triage:
 
 | Field | Example | Notes |
 |-------|---------|-------|
-| Case ID | `CLM-2026-004821` | Primary identifier |
+| Case ID | `RES-2026-004821` | Primary identifier |
 | Case type | `Property Damage — Water` | Domain context |
-| Agent | `ClaimsReviewAgent` | Which agent processed it |
+| Agent | `ResearchAgent` | Which agent processed it |
 | Decision | `Partial Approval` | Only shown if decision exists |
 | Risk | `● High` | Color-coded: green/yellow/red |
 | Duration | `45s` | Processing time |
@@ -104,7 +104,7 @@ Answer: **"What decision was made?"**
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  ← Back to Command Center                                               │
 │                                                                         │
-│  CLM-2026-004821 — Property Damage (Water)                             │
+│  RES-2026-004821 — Property Damage (Water)                             │
 │  Status: Review Required  │  Risk: ● High  │  Duration: 45s            │
 │                                                                         │
 │  ┌─ Tabs ──────────────────────────────────────────────────────────┐   │
@@ -113,21 +113,21 @@ Answer: **"What decision was made?"**
 │                                                                         │
 │  DECISION                                                               │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  ◆ Partial Approval                                             │   │
-│  │  $12,400 of $18,000 claimed                                     │   │
-│  │                                                                 │   │
-│  │  Primary reason: Contents damage covered under Section 3.1;     │   │
-│  │  structural damage excluded under Section 4.2.1 (external flood)│   │
+│  │  ◆ Recommended with Caveats                                  │   │
+│  │  Conditional: phased pilot entry (cost baseline unresolved)   │   │
+│  │                                                             │   │
+│  │  Primary reason: Demand-side evidence supports a pilot;      │   │
+│  │  competitor cost baseline fails Section 5.3 validation       │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  AGENT                          │  HUMAN REVIEW                        │
-│  ClaimsReviewAgent v1.2.0       │  ⚠ Review Triggered                 │
-│  insurance_claims               │  Reason: Claim > $10K partial       │
+│  ResearchAgent v1.2.0       │  ⚠ Review Triggered                 │
+│  deloitte_client_research               │  Reason: §5.3 cost baseline unmet │
 │                                 │  Status: Pending                     │
 │                                                                         │
 │  CASE INPUTS                                                            │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  Claimant: Jane Doe          │  Amount: $18,000.00              │   │
+│  │  Client: Tata Power      │  Engagement: ENG-2026-TP-018              │   │
 │  │  Policy: POL-8842-C          │  Incident: 2026-07-14            │   │
 │  │  Description: Basement flooding after heavy rainfall             │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
@@ -163,19 +163,19 @@ Answer: **"Why was it made?"**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Decision Trail — CLM-2026-004821                                       │
+│  Decision Trail — RES-2026-004821                                       │
 │                                                                         │
-│  ● 09:15:02  Case Received                                             │
-│  │           Claim CLM-2026-004821 received for automated review        │
-│  │                                                                      │
-│  ● 09:15:05  Customer Data Retrieved                                   │
-│  │           Policy and 3-year claim history retrieved                  │
-│  │                                                                      │
-│  ● 09:15:08  Policy Retrieved                                          │
-│  │           Policy POL-8842-C coverage details loaded                   │
-│  │                                                                      │
-│  ● 09:15:15  Relevant Clause Identified                                │
-│  │           Section 4.2.1 — Water Damage Exclusion                      │
+│  ● 09:15:02  Research Task Received                                 │
+│  │           Research task RES-2026-004821 received for processing   │
+│  │                                                                  │
+│  ● 09:15:05  Data Retrieved                                         │
+│  │           Client engagement brief and market data retrieved      │
+│  │                                                                  │
+│  ● 09:15:08  Methodology Loaded                                    │
+│  │           Deloitte Research Methodology DEL-RM-2026 loaded       │
+│  │                                                                  │
+│  ● 09:15:15  Applicable Standard Identified                        │
+│  │           Methodology Section 5.3 — Market Entry Thresholds      │
 │  │           ┌──────────────────────────────────────────────────┐     │
 │  │           │ "Coverage excludes damage caused by flood..."      │     │
 │  │           └──────────────────────────────────────────────────┘     │
@@ -224,7 +224,7 @@ Answer: **"Can we reconstruct it?"**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Decision Replay — CLM-2026-004821                                      │
+│  Decision Replay — RES-2026-004821                                      │
 │                                                                         │
 │  Reconstruct the decision as it happened, using the stored audit record.│
 │  No agent re-execution — read-only replay from captured data.            │
@@ -233,15 +233,15 @@ Answer: **"Can we reconstruct it?"**
 │  ━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  STEP 3: Relevant Clause Identified                             │   │
-│  │  2026-08-10 09:15:15                                           │   │
-│  │                                                                 │   │
-│  │  The agent identified Section 4.2.1 — Water Damage Exclusion    │   │
-│  │  as applicable to this claim.                                   │   │
-│  │                                                                 │   │
-│  │  Policy: POL-8842-C                                            │   │
-│  │  ┌───────────────────────────────────────────────────────┐     │   │
-│  │  │ Section 4.2.1 — Water Damage Exclusion               │     │   │
+│  │  STEP 3: Applicable Standard Identified                        │
+│  │  2026-08-10 09:15:15                                           │
+│  │                                                                │
+│  │  The agent identified Methodology Section 5.3 — Market         │
+│  │  Entry Evidence Thresholds as applicable to this engagement.   │
+│  │                                                                │
+│  │  Policy: DEL-RM-2026                                           │
+│  │  ┌────────────────────────────────────────────────────┐        │
+│  │  │ Section 5.3 — Market Entry Evidence Thresholds      │        │
 │  │  │ "Coverage excludes damage caused by flood, surface     │     │   │
 │  │  │  water, or water below the surface of the ground,      │     │   │
 │  │  │  unless caused by a burst pipe or plumbing failure     │     │   │
@@ -280,7 +280,7 @@ Designed for **non-technical compliance users** — no cryptography jargon.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  Integrity Verification — CLM-2026-004821                               │
+│  Integrity Verification — RES-2026-004821                               │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                                                                 │   │

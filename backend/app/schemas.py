@@ -27,7 +27,7 @@ class EventAppend(BaseModel):
     details: Optional[dict[str, Any]] = None
 
 
-VALID_OUTCOMES = {"approved", "partially_approved", "denied", "escalated"}
+VALID_OUTCOMES = {"recommended", "recommended_with_caveats", "not_recommended", "escalated"}
 RATIONALE_REQUIRED_FIELDS = (
     "primary_reason",
     "supporting_factors",

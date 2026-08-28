@@ -8,7 +8,7 @@
 
 ```
 ┌──────────────┐
-│  User / Case │  Submits claim, loan app, etc.
+│  User / Client │  Issues a research mandate
 └──────┬───────┘
        │
        ▼
@@ -47,7 +47,7 @@
 | `active` | Agent available to process tasks |
 | `idle` | No tasks currently running (dashboard display only) |
 
-The prototype uses one pre-registered agent: **ClaimsReviewAgent v1.2.0**.
+The prototype uses one pre-registered agent: **ResearchAgent v1.2.0**.
 
 ### Task Lifecycle
 
@@ -96,14 +96,14 @@ Evidence is logged as part of decision events:
 POST /decisions/{id}/events
 {
   "event_type": "evidence_evaluated",
-  "summary": "Adjuster report and photos evaluated",
+  "summary": "Third-party market outlook evaluated",
   "details": {
     "evidence": {
       "evidence_type": "third_party_report",
-      "title": "Adjuster Field Report",
-      "source": "Claims Management System",
-      "content_summary": "Field adjuster noted water damage...",
-      "relevance": "Determines cause of water damage"
+      "title": "EV Charging Infrastructure Outlook 2026",
+      "source": "BloombergNEF (licensed)",
+      "content_summary": "34% CAGR forecast for western India...",
+      "relevance": "Primary demand-side source"
     }
   }
 }
@@ -142,7 +142,7 @@ POST /decisions/{id}/events
   "event_type": "human_review_triggered",
   "summary": "High-value partial approval flagged for human review",
   "actor": "system",
-  "details": { "trigger_reason": "Claim amount > $10,000 with partial approval" }
+  "details": { "trigger_reason": "Engagement value > $10,000 with partial approval" }
 }
 ```
 
@@ -171,28 +171,28 @@ See `02_Data_Driven_Design.md` for algorithm. The agent does not participate in 
 ```json
 {
   "task_id": "...",
-  "case_id": "CLM-2026-004821",
+  "case_id": "RES-2026-004821",
   "replay_steps": [
     {
       "step": 1,
       "timestamp": "...",
-      "title": "Case Received",
-      "description": "Claim CLM-2026-004821 received for automated review",
+      "title": "Research Task Received",
+      "description": "Research task RES-2026-004821 received for automated processing",
       "evidence": [],
       "policies": []
     },
     {
       "step": 2,
       "timestamp": "...",
-      "title": "Evidence Evaluated",
-      "description": "Adjuster report and photos evaluated",
-      "evidence": [{ "title": "Adjuster Field Report", "summary": "..." }],
+      "title": "Source Evaluated",
+      "description": "Third-party market outlook evaluated",
+      "evidence": [{ "title": "EV Charging Infrastructure Outlook 2026", "summary": "..." }],
       "policies": []
     }
   ],
   "final_decision": {
-    "outcome": "partially_approved",
-    "summary": "Partial approval: $12,400 of $18,000",
+    "outcome": "recommended_with_caveats",
+    "summary": "Conditional recommendation: phased pilot entry",
     "rationale": { "primary_reason": "..." }
   },
   "integrity": {
@@ -223,10 +223,10 @@ POST /agents
 
 ```json
 {
-  "name": "ClaimsReviewAgent",
+  "name": "ResearchAgent",
   "version": "1.2.0",
-  "domain": "insurance_claims",
-  "description": "Automated insurance claims review agent"
+  "domain": "deloitte_client_research",
+  "description": "Automated research agent"
 }
 ```
 
@@ -244,14 +244,12 @@ Request:
 ```json
 {
   "agent_id": "uuid",
-  "case_id": "CLM-2026-004821",
-  "case_type": "Property Damage — Water",
+  "case_id": "RES-2026-004821",
+  "case_type": "Market Entry Assessment — EV Charging",
   "inputs": {
-    "claimant_name": "Jane Doe",
-    "policy_number": "POL-8842-C",
-    "claim_amount": 18000.00,
-    "incident_date": "2026-07-14",
-    "incident_description": "Basement flooding after heavy rainfall"
+    "client_name": "Tata Power",
+    "engagement_code": "ENG-2026-TP-018",
+    "research_question": "Should Tata Power enter the commercial EV fast-charging market in Rajasthan?"
   }
 }
 ```
@@ -284,10 +282,10 @@ Request:
   "details": {
     "evidence": {
       "evidence_type": "third_party_report",
-      "title": "Adjuster Field Report",
-      "source": "Claims Management System",
-      "content_summary": "Field adjuster noted water damage to basement flooring",
-      "relevance": "Determines cause of water damage"
+      "title": "EV Charging Infrastructure Outlook 2026",
+      "source": "BloombergNEF (licensed)",
+      "content_summary": "Forecasts 34% CAGR for western India through FY30.",
+      "relevance": "Primary demand-side source"
     }
   }
 }
@@ -315,14 +313,14 @@ POST /decisions/{task_id}/complete
 Request:
 ```json
 {
-  "outcome": "partially_approved",
-  "outcome_summary": "Partial approval: $12,400 of $18,000 claimed",
+  "outcome": "recommended_with_caveats",
+  "outcome_summary": "Conditional recommendation: phased pilot entry; cost baseline to verify",
   "structured_rationale": {
-    "primary_reason": "Contents covered under Section 3.1; structural damage excluded under Section 4.2.1",
-    "supporting_factors": ["No pipe burst evidence", "Weather data confirms rainfall"],
+    "primary_reason": "Demand-side evidence supports a pilot; competitor cost baseline fails Section 5.3 validation",
+    "supporting_factors": ["Three independent demand-side sources", "State tariff cap supports margins"],
     "policy_basis": ["pol-ref-001", "pol-ref-002"],
     "evidence_basis": ["ev-001", "ev-002", "ev-003"],
-    "exclusions_applied": ["Section 4.2.1: Structural damage excluded"]
+    "exclusions_applied": ["Section 5.3: Full-scale entry deferred"]
   },
   "alternatives_considered": [
     { "outcome": "full_denial", "reason_rejected": "Contents coverage applies regardless" }
@@ -373,9 +371,9 @@ Response:
   "decisions": [
     {
       "task_id": "uuid",
-      "case_id": "CLM-2026-004821",
+      "case_id": "RES-2026-004821",
       "case_type": "Property Damage — Water",
-      "agent_name": "ClaimsReviewAgent",
+      "agent_name": "ResearchAgent",
       "status": "review_required",
       "risk_level": "high",
       "outcome": "partially_approved",
@@ -467,21 +465,21 @@ task = trustledger.start_decision(
 
 # 2. Log events as agent works
 trustledger.log_event(task.id, "data_retrieved",
-    summary="Policy and claim history retrieved", actor="agent")
+    summary="Client engagement brief and market data retrieved", actor="agent")
 
 trustledger.log_event(task.id, "evidence_evaluated",
-    summary="Adjuster report evaluated", actor="agent",
+    summary="Third-party market outlook evaluated", actor="agent",
     details={"evidence": {...}})
 
 trustledger.log_event(task.id, "clause_identified",
-    summary="Section 4.2.1 identified", actor="agent",
+    summary="Methodology Section 5.3 identified", actor="agent",
     details={"policy_reference": {...}})
 
 # 3. Complete
 trustledger.complete_decision(
     task.id,
-    outcome="partially_approved",
-    outcome_summary="Partial approval: $12,400 of $18,000",
+    outcome="recommended_with_caveats",
+    outcome_summary="Conditional recommendation: phased pilot entry",
     structured_rationale={...},
     requires_human_review=True
 )
@@ -493,16 +491,16 @@ trustledger.complete_decision(
 
 ## Simulated Agent (Prototype)
 
-The prototype includes `agents/claims_agent.py` — a scripted agent that:
+The prototype includes `agents/research_agent.py` — a scripted agent that:
 
-1. Reads synthetic claim cases from a JSON seed file
+1. Reads synthetic research cases from a JSON seed file
 2. Calls TrustLedger API at each step (with realistic delays)
-3. Produces varied outcomes: approved, partially approved, denied
-4. Triggers human review for high-value or high-risk cases
+3. Produces varied outcomes: recommended, recommended_with_caveats, not_recommended, escalated
+4. Triggers partner review for high-value or high-risk engagements
 
 **Prototype Design Decision:** LLM API integration is optional. The scripted agent is sufficient for demo reliability. An LLM-powered variant can replace the rationale generation in Week 4 if time permits.
 
-### Agent script flow (per claim)
+### Agent script flow (per engagement)
 
 ```
 1. start_decision(case)
