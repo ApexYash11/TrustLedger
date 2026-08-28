@@ -3,5 +3,40 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply bg-white text-stone-800 antialiased;
+  font-feature-settings: "cv02", "cv03";
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e0e0dd;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c9c9c4;
+}
+
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.card-hover:hover {
+  background: #fbfbfa;
+  box-shadow: 0 4px 12px rgba(15, 15, 15, 0.08);
+}
+
+.drag-over {
+  outline: 2px dashed #a3a3a0;
+  outline-offset: -4px;
+  background: #fafaf9;
+}
+
+.dragging {
+  opacity: 0.45;
+  transform: rotate(2deg);
 }
