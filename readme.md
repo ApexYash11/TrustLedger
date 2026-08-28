@@ -24,6 +24,7 @@ The agent decides. TrustLedger records and verifies.
 | [docs/08_Scope_and_Non_Goals.md](docs/08_Scope_and_Non_Goals.md) | What we will and will not build |
 | [docs/09_HLD.md](docs/09_HLD.md) | High-level design with diagrams |
 | [docs/10_Current_Status.md](docs/10_Current_Status.md) | Implementation status and evidence |
+| [docs/11_Domain_Pivot_Discussion.md](docs/11_Domain_Pivot_Discussion.md) | Assessment + plan for the Deloitte client-research pivot |
 | [docs/README.md](docs/README.md) | Full project overview |
 
 Source of truth for the problem statement: `TrustLedger_EOI_Enhanced.pptx`

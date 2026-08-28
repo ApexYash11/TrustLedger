@@ -39,7 +39,7 @@ def setup_db():
 def agent_id():
     resp = client.post(
         "/api/v1/agents",
-        json={"name": "ClaimsReviewAgent", "version": "1.2.0", "domain": "insurance_claims"},
+        json={"name": "ResearchAgent", "version": "1.2.0", "domain": "deloitte_client_research"},
     )
     return resp.json()["agent_id"]
 
@@ -49,9 +49,13 @@ def _start_task(agent_id):
         "/api/v1/decisions/start",
         json={
             "agent_id": agent_id,
-            "case_id": "CLM-2026-004821",
-            "case_type": "Property Damage — Water",
-            "inputs": {"claimant_name": "Jane Doe", "claim_amount": 18000.0},
+            "case_id": "RES-2026-004821",
+            "case_type": "Market Entry Assessment — EV Charging",
+            "inputs": {
+                "client_name": "Tata Power",
+                "engagement_code": "ENG-2026-TP-018",
+                "research_question": "Enter the Rajasthan EV fast-charging market?",
+            },
         },
     )
 
@@ -59,20 +63,20 @@ def _start_task(agent_id):
 def _log_events(task_id):
     client.post(
         f"/api/v1/decisions/{task_id}/events",
-        json={"event_type": "data_retrieved", "summary": "Policy and claim history retrieved"},
+        json={"event_type": "data_retrieved", "summary": "Client financials and market reports retrieved"},
     )
     client.post(
         f"/api/v1/decisions/{task_id}/events",
         json={
             "event_type": "clause_identified",
-            "summary": "Section 4.2.1 — Water Damage Exclusion identified",
+            "summary": "Methodology Section 5.3 — Market Entry Evidence Thresholds identified",
             "details": {
                 "policy_reference": {
-                    "policy_code": "POL-8842-C",
-                    "section": "Section 4.2.1",
-                    "title": "Water Damage Exclusion",
-                    "text_excerpt": "Coverage excludes damage caused by flood...",
-                    "application": "External rainfall flooding is excluded",
+                    "policy_code": "DEL-RM-2026",
+                    "section": "Section 5.3",
+                    "title": "Market Entry Evidence Thresholds",
+                    "text_excerpt": "A market entry recommendation requires three independent demand-side sources and a validated competitor cost baseline...",
+                    "application": "Competitor cost baseline fails the validation threshold",
                 }
             },
         },
@@ -81,14 +85,14 @@ def _log_events(task_id):
         f"/api/v1/decisions/{task_id}/events",
         json={
             "event_type": "evidence_evaluated",
-            "summary": "Adjuster report and photos evaluated",
+            "summary": "Third-party market outlook evaluated",
             "details": {
                 "evidence": {
                     "evidence_type": "third_party_report",
-                    "title": "Adjuster Field Report",
-                    "source": "Claims Management System",
-                    "content_summary": "No evidence of pipe burst.",
-                    "relevance": "Determines cause of water damage",
+                    "title": "EV Charging Infrastructure Outlook 2026",
+                    "source": "BloombergNEF (licensed)",
+                    "content_summary": "34% CAGR forecast for western India.",
+                    "relevance": "Primary demand-side source",
                 }
             },
         },
@@ -99,16 +103,16 @@ def _complete(task_id):
     return client.post(
         f"/api/v1/decisions/{task_id}/complete",
         json={
-            "outcome": "partially_approved",
-            "outcome_summary": "Partial approval: $12,400 of $18,000 claimed",
+            "outcome": "recommended_with_caveats",
+            "outcome_summary": "Conditional recommendation: phased pilot entry; 2 of 3 risk factors unresolved",
             "structured_rationale": {
-                "primary_reason": "Contents covered under Section 3.1; structural excluded under 4.2.1",
-                "supporting_factors": ["No pipe burst evidence"],
+                "primary_reason": "Demand-side evidence supports a pilot; competitor cost baseline fails Section 5.3 validation",
+                "supporting_factors": ["Three demand-side sources agree"],
                 "policy_basis": ["pol-ref-001"],
                 "evidence_basis": ["ev-001"],
-                "exclusions_applied": ["Section 4.2.1 structural damage excluded"],
+                "exclusions_applied": ["Section 5.3: full-scale entry deferred"],
             },
-            "alternatives_considered": [{"outcome": "full_denial", "reason_rejected": "Contents coverage applies"}],
+            "alternatives_considered": [{"outcome": "not_recommended", "reason_rejected": "Demand-side evidence is strong"}],
             "confidence_score": 0.87,
             "requires_human_review": True,
             "risk_level": "high",
@@ -124,7 +128,7 @@ def test_full_lifecycle_and_verify(agent_id):
 
     ev = client.post(
         f"/api/v1/decisions/{task_id}/events",
-        json={"event_type": "data_retrieved", "summary": "Policy retrieved"},
+        json={"event_type": "policy_retrieved", "summary": "Methodology DEL-RM-2026 loaded"},
     )
     assert ev.status_code == 200
     assert ev.json()["sequence"] == 2
@@ -141,10 +145,10 @@ def test_full_lifecycle_and_verify(agent_id):
     record = client.get(f"/api/v1/decisions/{task_id}")
     assert record.status_code == 200
     rec = record.json()
-    assert rec["task"]["case_id"] == "CLM-2026-004821"
+    assert rec["task"]["case_id"] == "RES-2026-004821"
     assert len(rec["evidence"]) == 1
     assert len(rec["policy_references"]) == 1
-    assert rec["decision"]["outcome"] == "partially_approved"
+    assert rec["decision"]["outcome"] == "recommended_with_caveats"
 
     sequences = [e["sequence"] for e in rec["events"]]
     assert sequences == sorted(sequences)
@@ -155,9 +159,9 @@ def test_full_lifecycle_and_verify(agent_id):
     assert verify["chain_status"] == "intact"
 
     replay = client.get(f"/api/v1/decisions/{task_id}/replay").json()
-    assert replay["case_id"] == "CLM-2026-004821"
+    assert replay["case_id"] == "RES-2026-004821"
     assert len(replay["replay_steps"]) > 5
-    assert replay["final_decision"]["outcome"] == "partially_approved"
+    assert replay["final_decision"]["outcome"] == "recommended_with_caveats"
     assert replay["integrity"]["verified"] is True
 
 

@@ -49,7 +49,7 @@ Represents the AI system executing decisions.
 | `agent_id` | Yes | UUID | Registration | Identity |
 | `name` | Yes | string | Registration | Dashboard display |
 | `version` | Yes | string | Registration | Audit: which model/version decided |
-| `domain` | Yes | string | Registration | Filter (e.g., `insurance_claims`) |
+| `domain` | Yes | string | Registration | Filter (e.g., `deloitte_client_research`) |
 | `description` | No | string | Registration | Context for reviewers |
 
 ### Task
@@ -59,8 +59,8 @@ A unit of agent work — maps to one Kanban card.
 | Field | Required | Type | Captured when | Why |
 |-------|----------|------|---------------|-----|
 | `task_id` | Yes | UUID | `POST /decisions/start` | Primary key |
-| `case_id` | Yes | string | Start | Business reference (e.g., `CLM-2026-004821`) |
-| `case_type` | Yes | string | Start | Dashboard label (e.g., `Property Damage Claim`) |
+| `case_id` | Yes | string | Start | Business reference (e.g., `RES-2026-004821`) |
+| `case_type` | Yes | string | Start | Dashboard label (e.g., `Market Entry Assessment`) |
 | `agent_id` | Yes | UUID | Start | Which agent owns this |
 | `status` | Yes | enum | Start + updates | Kanban column: `queued`, `running`, `review_required`, `completed`, `disputed` |
 | `risk_level` | No | enum | During/complete | `low`, `medium`, `high` — set when evaluable |
@@ -92,13 +92,13 @@ Append-only chronological log of what happened during the decision.
 
 | Type | When logged | Example summary |
 |------|-------------|-----------------|
-| `case_received` | Start | "Claim CLM-2026-004821 received for review" |
-| `data_retrieved` | Agent fetches data | "Customer policy and claim history retrieved" |
+| `case_received` | Start | "Research task RES-2026-004821 received for processing" |
+| `data_retrieved` | Agent fetches data | "Client engagement brief and data retrieved" |
 | `policy_retrieved` | Agent loads policy | "Policy POL-8842-C retrieved" |
 | `clause_identified` | Agent matches rules | "Section 4.2.1 — Water damage exclusion identified" |
 | `evidence_evaluated` | Agent assesses evidence | "Photos and adjuster report evaluated" |
 | `decision_generated` | Agent produces outcome | "Recommendation: Partial approval — $12,400 of $18,000" |
-| `human_review_triggered` | Escalation | "High-value claim flagged for human review" |
+| `human_review_triggered` | Escalation | "High-risk engagement flagged for human review" |
 | `human_review_completed` | Reviewer acts | "Reviewer approved agent recommendation" |
 | `record_sealed` | Complete | "Decision record sealed and hash-chained" |
 
@@ -115,7 +115,7 @@ Data or documents the agent retrieved and considered.
 | `task_id` | Yes | UUID | Event | Parent |
 | `evidence_type` | Yes | enum | Event | `document`, `photo`, `database_record`, `third_party_report` |
 | `title` | Yes | string | Event | Display: "Adjuster Field Report" |
-| `source` | Yes | string | Event | Where it came from: "Claims Management System" |
+| `source` | Yes | string | Event | Where it came from: "Engagement Data Room" |
 | `content_summary` | Yes | string | Event | Plain-language summary (not raw file) |
 | `content_ref` | No | string | Event | URI/ID to source system (not fetched in prototype) |
 | `retrieved_at` | Yes | timestamp | Event | Audit |
@@ -149,7 +149,7 @@ Final outcome — created on `POST /decisions/{id}/complete`.
 | `decision_id` | Yes | UUID | Complete | Identity |
 | `task_id` | Yes | UUID | Complete | Parent |
 | `outcome` | Yes | enum | Complete | `approved`, `partially_approved`, `denied`, `escalated` |
-| `outcome_summary` | Yes | string | Complete | "Partial approval: $12,400 of $18,000 claimed" |
+| `outcome_summary` | Yes | string | Complete | "Conditional recommendation: phased pilot; cost baseline unresolved" |
 | `structured_rationale` | Yes | JSONB | Complete | Business-readable reasoning (see below) |
 | `alternatives_considered` | No | JSONB | Complete | What other outcomes were evaluated |
 | `confidence_score` | No | float | Complete | Agent confidence (0–1), optional |
@@ -246,64 +246,62 @@ Replay uses **stored data only** — no re-invocation of the agent or LLM.
 
 ## Example: Complete TrustLedger Decision Record (JSON)
 
-Synthetic insurance claim — high-risk partial approval scenario.
+Synthetic research engagement — high-risk conditional recommendation (Tata Power EV market entry).
 
 ```json
 {
   "task": {
     "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "case_id": "CLM-2026-004821",
-    "case_type": "Property Damage — Water",
-    "agent_id": "agent-claims-v1",
+    "case_id": "RES-2026-004821",
+    "case_type": "Market Entry Assessment — EV Charging",
+    "agent_id": "agent-research-v1",
     "status": "review_required",
     "risk_level": "high",
     "human_review_status": "triggered",
     "inputs": {
-      "claimant_name": "Jane Doe",
-      "policy_number": "POL-8842-C",
-      "claim_amount": 18000.00,
-      "incident_date": "2026-07-14",
-      "incident_description": "Basement flooding after heavy rainfall; furniture and flooring damaged",
-      "property_address": "42 Oak Lane, Jaipur, RJ"
+      "client_name": "Tata Power",
+      "engagement_code": "ENG-2026-TP-018",
+      "research_question": "Should Tata Power enter the commercial EV fast-charging market in Rajasthan?",
+      "review_deadline": "2026-08-28"
     },
     "created_at": "2026-08-10T09:15:00Z",
     "started_at": "2026-08-10T09:15:02Z",
     "completed_at": "2026-08-10T09:15:47Z"
   },
   "agent": {
-    "agent_id": "agent-claims-v1",
-    "name": "ClaimsReviewAgent",
+    "agent_id": "agent-research-v1",
+    "name": "ResearchAgent",
     "version": "1.2.0",
-    "domain": "insurance_claims"
+    "domain": "deloitte_client_research"
   },
   "events": [
     {
       "sequence": 1,
       "event_type": "case_received",
       "timestamp": "2026-08-10T09:15:02Z",
-      "summary": "Claim CLM-2026-004821 received for automated review",
+      "summary": "Research task RES-2026-004821 received for automated processing",
       "actor": "system"
     },
     {
       "sequence": 2,
       "event_type": "data_retrieved",
       "timestamp": "2026-08-10T09:15:05Z",
-      "summary": "Customer policy and 3-year claim history retrieved",
+      "summary": "Client engagement brief and market data retrieved",
       "actor": "agent",
-      "details": { "policy_status": "active", "prior_claims_count": 1 }
+      "details": { "engagement_status": "active", "prior_studies": 1 }
     },
     {
       "sequence": 3,
       "event_type": "policy_retrieved",
       "timestamp": "2026-08-10T09:15:08Z",
-      "summary": "Policy POL-8842-C coverage details loaded",
+      "summary": "Deloitte Research Methodology DEL-RM-2026 loaded",
       "actor": "agent"
     },
     {
       "sequence": 4,
       "event_type": "clause_identified",
       "timestamp": "2026-08-10T09:15:15Z",
-      "summary": "Section 4.2.1 — Water Damage Exclusion identified as applicable",
+      "summary": "Methodology Section 5.3 — Market Entry Evidence Thresholds identified as applicable",
       "actor": "agent",
       "details": { "policy_ref": "pol-ref-001" }
     },
@@ -311,7 +309,7 @@ Synthetic insurance claim — high-risk partial approval scenario.
       "sequence": 5,
       "event_type": "evidence_evaluated",
       "timestamp": "2026-08-10T09:15:22Z",
-      "summary": "Adjuster report and photos evaluated — no evidence of pipe burst",
+      "summary": "Third-party market outlook evaluated",
       "actor": "agent",
       "details": { "evidence_refs": ["ev-001", "ev-002"] }
     },
@@ -319,7 +317,7 @@ Synthetic insurance claim — high-risk partial approval scenario.
       "sequence": 6,
       "event_type": "evidence_evaluated",
       "timestamp": "2026-08-10T09:15:30Z",
-      "summary": "Weather data confirms heavy rainfall on incident date",
+      "summary": "Competitor cost baseline reviewed — conflicting figures found",
       "actor": "agent",
       "details": { "evidence_refs": ["ev-003"] }
     },
@@ -327,16 +325,16 @@ Synthetic insurance claim — high-risk partial approval scenario.
       "sequence": 7,
       "event_type": "decision_generated",
       "timestamp": "2026-08-10T09:15:38Z",
-      "summary": "Recommendation: Partial approval — $12,400 of $18,000 claimed",
+      "summary": "Recommendation: Conditional — phased pilot; full-scale deferred pending cost verification",
       "actor": "agent"
     },
     {
       "sequence": 8,
       "event_type": "human_review_triggered",
       "timestamp": "2026-08-10T09:15:40Z",
-      "summary": "High-value partial approval flagged for human review",
+      "summary": "Competitor cost baseline fails Section 5.3 validation threshold flagged for partner review",
       "actor": "system",
-      "details": { "trigger_reason": "Claim amount > $10,000 with partial approval" }
+      "details": { "trigger_reason": "Methodology Section 5.3 evidence threshold unmet" }
     },
     {
       "sequence": 9,
@@ -350,71 +348,71 @@ Synthetic insurance claim — high-risk partial approval scenario.
     {
       "evidence_id": "ev-001",
       "evidence_type": "third_party_report",
-      "title": "Adjuster Field Report",
-      "source": "Claims Management System",
-      "content_summary": "Field adjuster noted water damage to basement flooring and furniture. No visible pipe damage. Damage consistent with external water entry.",
+      "title": "EV Charging Infrastructure Outlook 2026",
+      "source": "BloombergNEF (licensed)",
+      "content_summary": "Forecasts 34% CAGR for commercial fast-charging demand in western India through FY30.",
       "retrieved_at": "2026-08-10T09:15:20Z",
-      "relevance": "Determines cause of water damage — external vs. plumbing"
+      "relevance": "Primary demand-side source for the pilot-scale estimate"
     },
     {
       "evidence_id": "ev-002",
-      "evidence_type": "photo",
-      "title": "Damage Photos (4 images)",
-      "source": "Claimant Upload Portal",
-      "content_summary": "Photos show flooded basement, wet furniture, damaged laminate flooring. No visible pipe fixtures in damaged area.",
-      "retrieved_at": "2026-08-10T09:15:21Z",
-      "relevance": "Visual confirmation of damage extent and cause indicators"
+      "evidence_type": "document",
+      "title": "Competitor Benchmark Set (4 operators)",
+      "source": "Client Data Room",
+      "content_summary": "Per-kWh prices across the four benchmarked operators vary by 22% between the two compiled sources; two figures could not be reconciled.",
+      "retrieved_at": "2026-08-10T09:15:29Z",
+      "relevance": "Competitor cost baseline fails the Section 5.3 validation threshold"
     },
     {
       "evidence_id": "ev-003",
       "evidence_type": "database_record",
-      "title": "Weather Event Data",
-      "source": "National Weather Service API",
-      "content_summary": "Heavy rainfall recorded on 2026-07-14: 62mm in 24 hours. Flood watch was in effect for the area.",
+      "title": "Rajasthan EV Policy 2024 and Tariff Orders",
+      "source": "State Electricity Regulatory Commission Portal",
+      "content_summary": "Per-kWh charging tariff capped at ₹1.10; charging stations classified as a licensed activity with simplified approvals.",
       "retrieved_at": "2026-08-10T09:15:28Z",
-      "relevance": "Corroborates claimant's account of rainfall-induced flooding"
+      "relevance": "Establishes the regulatory cost base for the charging-margin model"
     }
   ],
   "policy_references": [
     {
       "policy_id": "pol-ref-001",
-      "policy_code": "POL-8842-C",
-      "section": "Section 4.2.1",
-      "title": "Water Damage Exclusion",
-      "text_excerpt": "Coverage excludes damage caused by flood, surface water, or water below the surface of the ground, unless caused by a burst pipe or plumbing failure within the insured structure.",
-      "application": "External rainfall flooding is excluded. However, Section 3.1 covers contents damage separately up to $15,000 regardless of cause."
+      "policy_code": "DEL-RM-2026",
+      "section": "Section 5.3",
+      "title": "Market Entry Evidence Thresholds",
+      "text_excerpt": "A market entry recommendation requires three independent demand-side sources and a validated competitor cost baseline; otherwise the engagement must be escalated for partner review.",
+      "application": "Three demand-side sources are available, but the competitor cost baseline has conflicting figures — full-scale entry cannot be recommended yet."
     },
     {
       "policy_id": "pol-ref-002",
-      "policy_code": "POL-8842-C",
-      "section": "Section 3.1",
-      "title": "Personal Contents Coverage",
-      "text_excerpt": "Personal contents coverage up to $15,000 for damage to furniture, electronics, and personal items, subject to standard deductibles.",
-      "application": "Contents damage of $12,400 (furniture + electronics) is covered under this section."
+      "policy_code": "DEL-RM-2026",
+      "section": "Section 2.4",
+      "title": "Independence and Conflicts Check",
+      "text_excerpt": "Research engagements must be screened against the firm conflict register before fieldwork and again before the recommendation is issued.",
+      "application": "No conflict found: the firm has no concurrent engagement with competing charging-infrastructure operators."
     }
   ],
   "decision": {
     "decision_id": "dec-004821",
-    "outcome": "partially_approved",
-    "outcome_summary": "Partial approval: $12,400 of $18,000 claimed. Structural/flooring damage ($5,600) excluded under Section 4.2.1. Contents ($12,400) approved under Section 3.1.",
+    "outcome": "recommended_with_caveats",
+    "outcome_summary": "Conditional recommendation: enter via a phased pilot in the Jaipur–Udaipur corridor. Demand-side evidence supports pilot scale, but the competitor cost baseline is contested — full-scale entry is deferred pending verification (Methodology Section 5.3).",
     "structured_rationale": {
-      "primary_reason": "Contents damage is covered under Section 3.1, but structural flooring damage falls under the water damage exclusion in Section 4.2.1 because the flooding was caused by external rainfall, not a pipe burst.",
+      "primary_reason": "Demand-side sources triangulate to a viable pilot scale, but the competitor cost baseline fails the validation threshold in Section 5.3, so a full-scale entry recommendation cannot be defended yet.",
       "supporting_factors": [
-        "Adjuster report found no evidence of pipe burst or plumbing failure",
-        "Weather data confirms heavy rainfall on incident date",
-        "Photos consistent with external water entry, not plumbing damage"
+        "Three independent demand-side sources agree on pilot-scale volumes",
+        "State tariff cap and simplified licensing improve unit economics",
+        "Competitor price figures vary by 22% across sources and remain unreconciled"
       ],
       "policy_basis": ["pol-ref-001", "pol-ref-002"],
       "evidence_basis": ["ev-001", "ev-002", "ev-003"],
       "exclusions_applied": [
-        "Section 4.2.1: Structural/flooring damage ($5,600) excluded — external flood water"
+        "Section 5.3: Full-scale entry deferred — competitor cost baseline unverified"
       ]
     },
     "alternatives_considered": [
-      { "outcome": "full_denial", "reason_rejected": "Contents coverage (Section 3.1) applies regardless of water damage cause" },
-      { "outcome": "full_approval", "reason_rejected": "Section 4.2.1 excludes structural damage from external flooding" }
+      { "outcome": "recommended", "reason_rejected": "Recommending full-scale entry on an unverified cost baseline breaches Section 5.3" },
+      { "outcome": "not_recommended", "reason_rejected": "Demand-side evidence is strong; declining the pilot ignores a validated opportunity" }
     ],
-    "confidence_score": 0.87,
+    "confidence_score": 0.81,
     "decided_at": "2026-08-10T09:15:38Z"
   },
   "audit_record": {

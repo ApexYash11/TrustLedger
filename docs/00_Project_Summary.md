@@ -18,11 +18,11 @@ The core story for evaluators:
 
 ## 2. Problem
 
-Agents already make high-stakes calls in insurance, lending, healthcare, HR, and government — but organizations cannot easily explain **what data drove the decision** or **what alternatives existed**.
+Agents already make high-stakes calls in consulting, financial advice, and corporate operations — but organizations cannot easily explain **what data drove the recommendation** or **what alternatives existed**.
 
 | Impact | Consequence |
 |--------|-------------|
-| Regulatory exposure | Indefensible AI decisions create compliance risk (e.g., adverse-action disclosure, claims-denial rationale) |
+| Regulatory exposure | Indefensible AI recommendations create professional-standards and client liability risk |
 | Operational cost | Disputes require slow, expensive manual reconstruction across scattered logs |
 | Fragmentation | Every business unit invents its own logging approach — no shared standard |
 | Adoption ceiling | Only ~11% of orgs have agents in production vs. ~38% piloting; trust gaps are a key blocker |
@@ -59,12 +59,12 @@ It produces a **standardized decision record** containing:
 The prototype succeeds if an evaluator can, in a 3–5 minute demo:
 
 1. See AI agent tasks on a Kanban dashboard
-2. Open a high-risk insurance claim decision
+2. Open a high-risk client-research recommendation
 3. Understand **what** was decided and **why** (evidence + policy)
 4. Replay the decision step-by-step from the stored record
 5. Verify the record has not been tampered with (hash-chain check)
 
-**In scope:** One domain (insurance claims), one simulated agent, synthetic data, ~10–20 pre-seeded decision records, working dashboard, replay, and integrity verification.
+**In scope:** One domain (Deloitte client research), one simulated agent, synthetic data, ~10–20 pre-seeded decision records, working dashboard, replay, and integrity verification.
 
 **Out of scope:** Production auth/RBAC, real PII, enterprise integrations, multi-agent orchestration, regulatory certification.
 
@@ -77,7 +77,7 @@ The prototype succeeds if an evaluator can, in a 3–5 minute demo:
 | Frontend | Next.js + React | Kanban dashboard, decision detail, trail, replay, integrity UI |
 | Backend | FastAPI (Python) | Logging API, decision retrieval, replay, verification |
 | Database | PostgreSQL | Decision records, events, evidence, hash chain |
-| Agent | Simulated Python agent (+ optional LLM API) | Generates synthetic claim decisions and logs to TrustLedger |
+| Agent | Simulated Python agent (+ optional LLM API) | Generates synthetic research recommendations and logs to TrustLedger |
 | Integrity | SHA-256 hash chaining | Tamper-evidence on standard PostgreSQL |
 
 **Prototype Design Decision:** OpenSearch/Elasticsearch (mentioned in EOI) is **deferred** — PostgreSQL full-text search is sufficient for ~20 demo records.
@@ -103,7 +103,7 @@ Kanban columns: **Queued → Running → Review Required → Completed**
 Core entities (logical; may map to fewer DB tables):
 
 - **Agent** — which AI system made the decision
-- **Task** — a unit of work (e.g., one claim review)
+- **Task** — a unit of work (e.g., one research engagement)
 - **Decision** — final outcome + structured rationale
 - **Decision Event** — chronological audit steps
 - **Evidence** — documents/data retrieved and evaluated
@@ -136,7 +136,7 @@ See `03_Agent_Based_Design.md` for full contract.
 ## 9. Demo Flow (Summary)
 
 1. Open Agent Command Center — "This is where we see what our AI agents are doing."
-2. Click a high-risk claim in **Review Required**
+2. Click a high-risk engagement in **Review Required**
 3. Show decision outcome and risk level
 4. Open Decision Trail — chronological steps
 5. Show evidence and policy references
@@ -222,7 +222,7 @@ Features that look impressive but distract from the core concept:
 - SHAP/LIME explainability charts
 - Blockchain integration (hash chain on PostgreSQL is sufficient for demo)
 - Full-text search across thousands of records (OpenSearch)
-- Multiple domain workflows (stick to insurance claims)
+- Multiple domain workflows (stick to client research)
 - Agent builder / prompt editor
 - Mobile app
 - Email/Slack notification system
@@ -237,7 +237,7 @@ Features that look impressive but distract from the core concept:
 | Timeline | 12 weeks | ~4 weeks (Sep 2nd week deadline) | Prototype Design Decision |
 | Dashboard UX | "searchable dashboard" | Kanban Agent Command Center | Prototype Design Decision |
 | Search | OpenSearch/Elasticsearch | PostgreSQL queries only | Prototype Design Decision |
-| Domain | Insurance claims or lending | Insurance claims only | Prototype Design Decision |
+| Domain | Insurance claims or lending (original EOI) | Deloitte client research (pivoted) | Prototype Design Decision |
 | Agent count | One simulated agent | One simulated agent | Aligned |
 | Hash chaining | Standard DB demo | SHA-256 on PostgreSQL | Aligned |
 | KPIs | <2 min reconstruction, 100% tamper-evidence, ≥90% comprehension | Same targets for demo | Aligned |
@@ -249,11 +249,10 @@ Features that look impressive but distract from the core concept:
 **One sentence:**  
 TrustLedger creates tamper-evident, business-readable audit records for high-stakes AI agent decisions — so compliance teams can understand, replay, and defend every call in minutes, not days.
 
-**30 seconds:**  
-When AI agents approve claims, loans, or hiring decisions, organizations struggle to explain why. TrustLedger wraps around existing agents and captures evidence, policy references, and structured rationale as the decision happens — not after a dispute. Compliance and audit teams get a searchable dashboard, one-click decision replay, and cryptographic proof the record wasn't altered. Same schema works across industries; we demo it on insurance claims.
+**30 seconds:**  When AI agents draft client recommendations — market entry, due diligence, M&A screening — organizations struggle to explain why. TrustLedger wraps around existing agents and captures evidence, methodology references, and structured rationale as the decision happens — not after a dispute. QRM and engagement teams get a searchable dashboard, one-click decision replay, and cryptographic proof the record wasn't altered. Same schema works across service lines; we demo it on **Deloitte client research**.
 
 **2 minutes:**  
-High-stakes AI decisions are already happening, but only 11% of organizations have agents in production because they can't defend those decisions. Today, investigating a disputed AI call means manually reconstructing logs across systems — taking days and creating regulatory exposure. TrustLedger solves this with a standardized decision record created live during agent execution. An API-first logging layer captures inputs, evidence, policy clauses, decision events, and structured rationale — never raw model chain-of-thought. Records are hash-chained for tamper evidence. A Trust Dashboard — starting with an Agent Command Center — lets business users see active decisions, open any case, walk through the decision trail, replay the reasoning step-by-step, and verify integrity. The agent keeps making decisions; TrustLedger makes them auditable. Our prototype uses a simulated insurance claims agent with synthetic data to demonstrate the full flow in under five minutes.
+High-stakes AI decisions are already happening, but only 11% of organizations have agents in production because they can't defend those decisions. Today, investigating a disputed recommendation means manually reconstructing working papers across systems — taking days and creating professional-standards and client-liability exposure. TrustLedger solves this with a standardized decision record created live during agent execution. An API-first logging layer captures inputs, evidence, methodology clauses, engagement events, and structured rationale — never raw model chain-of-thought. Records are hash-chained for tamper evidence. A Trust Dashboard — starting with a Research Command Center — lets business users see active engagements, open any case, walk through the decision trail, replay the reasoning step-by-step, and verify integrity. The agent keeps recommending; TrustLedger makes those calls auditable. Our prototype uses a simulated research agent with synthetic data to demonstrate the full flow in under five minutes.
 
 ---
 

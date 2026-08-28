@@ -10,10 +10,10 @@ The prototype **must** include:
 
 | Item | Definition |
 |------|------------|
-| **One domain** | Insurance claims |
-| **One simulated agent** | ClaimsReviewAgent v1.2.0 |
-| **Synthetic data only** | No real customer PII |
-| **One decision workflow** | Claim received → evidence/policy evaluated → decision → optional human review → seal |
+| **One domain** | Deloitte client research |
+| **One simulated agent** | ResearchAgent v1.2.0 |
+| **Synthetic data only** | No real client PII |
+| **One decision workflow** | Engagement received → evidence/methodology evaluated → recommendation → optional human review → seal |
 | **Small record set** | 10–20 pre-seeded decision records |
 | **Working dashboard** | Kanban Agent Command Center |
 | **Working decision replay** | Step-through reconstruction from stored data |
@@ -30,10 +30,10 @@ The prototype will **not** attempt:
 
 - Login, SSO, OAuth, SAML
 - Full RBAC implementation
-- Per-role data filtering (e.g., claims auditor only sees claims)
+- Per-role data filtering (e.g., a QRM partner only sees engagements they own)
 - Session management, password reset, MFA
 
-*Production consideration:* Role-based access so a claims auditor only sees claims records (stated in EOI).
+*Production consideration:* Role-based access so a research analyst or partner only sees their engagements (stated in EOI).
 
 ### Production-Grade Immutable Storage
 
@@ -47,12 +47,12 @@ The prototype will **not** attempt:
 
 ### Multiple Enterprise Integrations
 
-- Case management systems
+- Policy repositories
 - Policy repositories
 - CRMs
 - Document management systems
 - Weather APIs (real)
-- Claims management systems (real)
+- Engagement/diligence sources (real)
 
 *Prototype:* Mock/synthetic sources referenced by name in evidence records.
 
@@ -123,7 +123,7 @@ Do **not** build these even if they seem like good demo material:
 | SHAP/LIME charts | Contradicts "business user first" |
 | Agent prompt editor | Positions TrustLedger as an agent builder |
 | PDF compliance report generator | Nice-to-have; not needed for 4-minute demo |
-| Multiple domain workflows | Dilutes the insurance claims story |
+| Multiple domain workflows | Dilutes the client research story |
 | Mobile app | Demo is on laptop/projector |
 | Email/Slack notifications | Operational feature, not audit feature |
 | Analytics dashboards (charts of decision volume) | BI, not trust layer |

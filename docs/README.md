@@ -9,7 +9,7 @@ Deloitte Capstone 2026 · Team Diet Coke · Manipal University Jaipur
 
 TrustLedger is a trust layer that wraps around existing AI agents. It does **not** make business decisions. It captures a standardized, tamper-evident decision record **while the decision is happening**, then presents it to compliance, audit, and legal teams in language they can understand.
 
-When an AI agent approves, denies, or partially approves a high-stakes case — an insurance claim, a loan, a hiring recommendation — TrustLedger records the evidence, policy references, structured rationale, and a cryptographic audit trail so the organization can later explain and defend that call.
+When an AI agent approves, denies, or partially approves a high-stakes case — a market-entry analysis, a vendor due-diligence or M&A screening recommendation — TrustLedger records the evidence, methodology references, structured rationale, and a cryptographic audit trail so the organization can later explain and defend that call.
 
 ---
 
@@ -43,7 +43,7 @@ A standardized **decision record** is created live, containing:
 - Chronological decision events
 - Tamper-evident hash chain
 
-The same core schema works across industries; only the policy references change. The prototype demonstrates this on **insurance claims**.
+The same core schema works across industries; only the methodology/standard references change. The prototype demonstrates this on **Deloitte client research** (market entry studies, vendor due diligence, M&A screening, pricing benchmarks).
 
 ---
 
@@ -69,7 +69,7 @@ FastAPI (logging, replay, verification)
         ▼
 PostgreSQL (decision records + hash chain)
 
-Simulated Claims Agent ──► FastAPI logging endpoints
+Simulated Research Agent ──► FastAPI logging endpoints
 ```
 
 See `docs/05_Tech_Stack_and_Architecture.md` for the full diagram and rationale.
@@ -79,7 +79,7 @@ See `docs/05_Tech_Stack_and_Architecture.md` for the full diagram and rationale.
 ## Demo Flow (3–5 minutes)
 
 1. Open the Agent Command Center — see what agents are doing
-2. Click a high-risk disputed claim
+2. Click a high-risk disputed engagement
 3. Show the decision in plain language
 4. Walk the Decision Trail
 5. Show evidence and policy references
@@ -99,7 +99,7 @@ Full script: `docs/06_Demo_Showcase_Flow.md`
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL |
 | Integrity | SHA-256 hash chaining |
-| Agent | Simulated Python claims agent (optional LLM API) |
+| Agent | Simulated Python research agent (optional LLM API) |
 | Runtime | Docker Compose, local demo |
 
 ---

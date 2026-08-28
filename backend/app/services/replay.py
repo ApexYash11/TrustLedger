@@ -4,12 +4,12 @@ from ..models import Decision, DecisionEvent, Task
 from .sealer import extract_evidence_and_policies
 
 EVENT_TYPE_TITLES = {
-    "case_received": "Case Received",
+    "case_received": "Research Task Received",
     "data_retrieved": "Data Retrieved",
-    "policy_retrieved": "Policy Retrieved",
-    "clause_identified": "Relevant Clause Identified",
-    "evidence_evaluated": "Evidence Evaluated",
-    "decision_generated": "Decision Generated",
+    "policy_retrieved": "Methodology Loaded",
+    "clause_identified": "Applicable Standard Identified",
+    "evidence_evaluated": "Source Evaluated",
+    "decision_generated": "Recommendation Generated",
     "human_review_triggered": "Human Review Triggered",
     "human_review_completed": "Human Review Completed",
     "record_sealed": "Record Sealed",

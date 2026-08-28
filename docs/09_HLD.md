@@ -8,12 +8,12 @@
 
 ## 1. What TrustLedger Is (Simple Text)
 
-TrustLedger is a **trust layer that wraps around AI agents**. It never makes business decisions itself. When an AI agent makes a high-stakes decision (e.g., approving or denying an insurance claim), TrustLedger:
+TrustLedger is a **trust layer that wraps around AI agents**. It never makes business decisions itself. When an AI research agent makes a high-stakes recommendation (e.g., whether a client should enter a market or acquire a target), TrustLedger:
 
 1. **Records** every step the agent takes — as it happens
-2. **Structures** the record in plain business language (evidence, policy clauses, rationale)
+2. **Structures** the record in plain business language (evidence, methodology clauses, rationale)
 3. **Seals** the record with a cryptographic hash chain (tamper-evident)
-4. **Shows** everything on a dashboard a compliance officer can use
+4. **Shows** everything on a dashboard a QRM/partner can use
 5. **Replays** the decision later, step by step, from stored data only
 
 **One line:** The agent decides. TrustLedger records and verifies.
@@ -24,8 +24,8 @@ TrustLedger is a **trust layer that wraps around AI agents**. It never makes bus
 
 ```
                         ┌────────────────────┐
-   Insurance claim ───► │   Simulated AI     │
-   (synthetic data)     │   Claims Agent     │
+   Client research engagement ─► │   Simulated AI     │
+   (synthetic data)             │   Research Agent   │
                         └─────────┬──────────┘
                                   │ calls API at each step
                                   ▼
@@ -61,7 +61,7 @@ flowchart TB
     end
 
     subgraph AgentLayer["Agent Layer"]
-        SIM["Simulated Claims Agent (Python, scripted)"]
+        SIM["Simulated Research Agent (Python, scripted)"]
     end
 
     subgraph Storage["PostgreSQL"]

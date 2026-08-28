@@ -8,7 +8,7 @@
 
 ## 1. One-Paragraph Status
 
-The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with 12/12 automated tests passing and a live end-to-end smoke test completed. The frontend scaffold (Next.js + Tailwind) has a working Kanban Command Center and a decision detail page. Everything is on branch `yash` under PR #1, pending team merge. Remaining: simulated agent + seed data (this week), full Replay/Integrity UI (Week 3), tamper demo + rehearsal (Week 4).
+The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with 12/12 automated tests passing and a live end-to-end smoke test completed. The frontend scaffold (Next.js + Tailwind) has a working Kanban Command Center and a decision detail page. Everything is on branch `yash` under PR #1, pending team merge. The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: full Replay/Integrity UI (Week 3), tamper demo + rehearsal (Week 4).
 
 ---
 
@@ -36,11 +36,11 @@ Architecture    Agent           Audit Trail     Polish + Demo
 | `GET /decisions` (list + filters) | ✅ Done |
 | `GET /decisions/{id}/verify` | ✅ Done |
 | Hash chain unit tests (append, verify, tamper) | ✅ Done |
-| Simulated claims agent (`agents/claims_agent.py`) | ⬜ Next |
-| Seed script (15+ demo records) | ⬜ Next |
+| Simulated research agent (`agents/research_agent.py`) | ✅ Done |
+| Seed script (16 research demo records) | ✅ Done |
 | Docker Compose running locally | ✅ Done (Docker unavailable on dev laptop; compose file ready) |
 
-**Week 2 exit check (pending agent+seed):** open `/docs`, fetch `CLM-2026-004821`, show JSON with trail + hash, all seed records verify green.
+**Week 2 exit check (agent+seed done):** fetch `RES-2026-004821`, show JSON with trail + hash; all seed records verify green except the pre-tampered `RES-2026-009999`.
 
 ---
 
@@ -49,6 +49,10 @@ Architecture    Agent           Audit Trail     Polish + Demo
 ```
 TrustLedger/  (branch: yash → PR #1 → main)
 ├── backend/
+│   ├── agents/                     ResearchAgent (drives the API)
+│   │   └── research_agent.py       replays seed scenarios
+│   ├── seed/                      demo_data.json (16 research scenarios)
+│   │   └── load_demo_data.py      loads + tampers one record for the demo
 │   ├── app/
 │   │   ├── main.py               FastAPI app, lifespan, CORS (localhost:3000)
 │   │   ├── db.py                 SQLAlchemy; SQLite default, Postgres via env
@@ -89,8 +93,8 @@ TrustLedger/  (branch: yash → PR #1 → main)
 ### Live smoke test (real uvicorn + HTTP)
 
 ```
-register agent → start CLM-2026-004821 → log evidence event
-→ complete (partial approval, review required)
+register agent → start RES-2026-004821 → log evidence event
+→ complete (conditional recommendation, review required)
 → sealed: hash 96fbfec5…b40f
 → verify: True / chain_status: intact
 → chain verify: "All 1 records in chain verified."
@@ -129,8 +133,8 @@ register agent → start CLM-2026-004821 → log evidence event
 
 ## 7. Next Steps (In Order)
 
-1. **Simulated claims agent** — scripted lifecycle with varied outcomes (approved / partial / denied / escalated)
-2. **Seed data** — 15+ records across all Kanban columns, hero case `CLM-2026-004821`, one pre-tampered record `CLM-2026-009999`
+1. **Simulated research agent** — scripted lifecycle with varied outcomes (approved / partial / denied / escalated)
+2. **Seed data** — 15+ records across all Kanban columns, hero case `RES-2026-004821`, one pre-tampered record `RES-2026-009999`
 3. **Week 2 exit check** — all seeds verify green, chain verify-all passes
 4. **Week 3** — Replay tab, Integrity tab, full demo click-through
 5. **Week 4** — tamper contrast demo, polish, 3 rehearsals of the 4:20 script

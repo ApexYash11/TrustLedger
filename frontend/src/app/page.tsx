@@ -66,7 +66,7 @@ export default function KanbanPage() {
   return (
     <main className="p-6">
       <h1 className="text-2xl font-bold mb-1">TrustLedger</h1>
-      <p className="text-slate-500 mb-5">Agent Command Center · {data.total} tasks</p>
+      <p className="text-slate-500 mb-5">Research Command Center · {data.total} engagements</p>
       <div className="grid grid-cols-4 gap-4">
         {COLUMNS.map((col) => {
           const cards = data.decisions.filter(

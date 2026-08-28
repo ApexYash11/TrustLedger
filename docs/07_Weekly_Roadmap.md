@@ -38,7 +38,7 @@ Lock the problem statement, MVP scope, data model, API contract, and demo story.
 - [x] Data model (`02_Data_Driven_Design.md`)
 - [x] API design (`03_Agent_Based_Design.md`)
 - [x] Dashboard wireframes (`04_Dashboard_Design.md`)
-- [ ] Seed JSON: 15 synthetic decision records (including CLM-2026-004821)
+- [ ] Seed JSON: 15 synthetic decision records (including RES-2026-004821)
 - [ ] Project scaffolding: `backend/` + `frontend/` + `docker-compose.yml`
 
 ### Team Roles
@@ -52,7 +52,7 @@ Lock the problem statement, MVP scope, data model, API contract, and demo story.
 
 ### Exit Criteria
 
-Documentation is coherent. Team agrees on demo claim (CLM-2026-004821). Schema is locked — no major changes after this week.
+Documentation is coherent. Team agrees on a hero demo engagement (RES-2026-004821). Schema is locked — no major changes after this week.
 
 ---
 
@@ -74,7 +74,7 @@ Working logging API, hash chain, simulated agent, and seeded records queryable v
 - [ ] `GET /decisions` (list for dashboard)
 - [ ] `GET /decisions/{id}/verify`
 - [ ] Hash chain unit tests (append, verify, tamper detection)
-- [ ] Simulated claims agent (`agents/claims_agent.py`)
+- [ ] Simulated research agent (`agents/research_agent.py`)
 - [ ] Seed script loading 15+ demo records
 - [ ] FastAPI running locally via Docker Compose
 
@@ -97,7 +97,7 @@ All 15 seed records pass integrity verification. One tampered record exists for 
 
 ### Demo-first checkpoint
 
-Can you open FastAPI `/docs`, fetch `CLM-2026-004821`, and show a JSON decision record with trail + hash? If yes, Week 2 is complete.
+Can you open FastAPI `/docs`, fetch `RES-2026-004821`, and show a JSON decision record with trail + hash? If yes, Week 2 is complete.
 
 ---
 
@@ -158,7 +158,7 @@ Integrity verification UI is evaluator-ready. UX is polished. Demo is rehearsed.
 
 - [ ] Integrity panel: plain-language pass/fail, chain of custody visual, expandable technical hashes
 - [ ] "Verify Now" live re-check
-- [ ] Tampered-record contrast demo (CLM-2026-009999)
+- [ ] Tampered-record contrast demo (RES-2026-009999)
 - [ ] UX refinement: spacing, badges, empty states, loading states
 - [ ] End-to-end testing of demo path
 - [ ] Demo dataset freeze (no more seed data changes after Tuesday)
@@ -218,7 +218,7 @@ What was dropped from the 12-week plan (intentional):
 
 ## Definition of "Demo Works Early"
 
-By end of **Week 2**: JSON record of CLM-2026-004821 is retrievable and verifiable.
+By end of **Week 2**: JSON record of RES-2026-004821 is retrievable and verifiable.
 
 By end of **Week 3**: Full UI click-through of Steps 1–6.
 
