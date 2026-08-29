@@ -28,7 +28,13 @@ function initials(name: string) {
 export default function TaskCard({ card }: { card: TaskSummary }) {
   const tag = card.case_type || "Case";
   const riskKey = card.risk_level ?? "";
-  const tagCls = RISK_TAGS[riskKey] ?? "bg-stone-100 text-stone-600 border-stone-200";
+  const tagCls = RISK_TAGS[riskKey];
+  const reviewLabel =
+    card.human_review_status === "pending"
+      ? "In review"
+      : card.human_review_status
+        ? card.human_review_status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : null;
 
   return (
     <a
@@ -37,7 +43,16 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
       className="card-hover block cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
     >
       <div className="mb-2.5 flex items-center justify-between">
-        <span className={`rounded border px-1.5 py-0.5 text-[11px] font-medium ${tagCls}`}>{tag}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
+            {tag}
+          </span>
+          {tagCls && (
+            <span className={`rounded border px-1.5 py-0.5 text-[11px] font-medium ${tagCls}`}>
+              {riskKey}
+            </span>
+          )}
+        </div>
         <span className="text-stone-300 hover:text-stone-500">...</span>
       </div>
 
@@ -52,7 +67,7 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
             {initials(card.agent_name || "AI")}
           </span>
           {card.duration_seconds != null && <span>{Math.round(card.duration_seconds)}s</span>}
-          {card.human_review_status && <span>In review</span>}
+          {reviewLabel && <span>{reviewLabel}</span>}
         </div>
         <span>{fmtDate(card.created_at)}</span>
       </div>

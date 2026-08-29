@@ -106,10 +106,23 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
   return res.json();
 }
 
+async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  return res.json();
+}
+
 export const api = {
   listDecisions: (params?: { status?: string; risk_level?: string; case_id?: string }) =>
     get<DecisionListResponse>("/decisions", params),
   getDecision: (taskId: string) => get<FullDecisionRecord>(`/decisions/${taskId}`),
   getReplay: (taskId: string) => get<ReplayResponse>(`/decisions/${taskId}/replay`),
   verifyDecision: (taskId: string) => get<VerifyResponse>(`/decisions/${taskId}/verify`),
+  updateDecisionStatus: (taskId: string, status: string) =>
+    patch<{ task_id: string; status: string }>(`/decisions/${taskId}/status`, { status }),
 };

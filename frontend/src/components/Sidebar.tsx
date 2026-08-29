@@ -1,8 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = ["Home", "My Task", "Inbox", "Project", "Decisions", "Reports"];
+const NAV = [
+  { label: "Home", href: "/" },
+  { label: "My Task", href: "/tasks" },
+  { label: "Inbox", href: "/inbox" },
+  { label: "Project", href: "/project" },
+  { label: "Decisions", href: "/" },
+  { label: "Reports", href: "/reports" },
+];
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -16,20 +24,21 @@ export default function Sidebar() {
       </div>
 
       <nav className="space-y-0.5">
-        {NAV.map((label) => (
-          <a
+        {NAV.map(({ label, href }) => (
+          <Link
             key={label}
-            href={pathname}
+            href={href}
             className={`block rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-              label === "Decisions"
+              pathname === href
                 ? "bg-stone-200/70 font-medium text-stone-900"
                 : "text-stone-600 hover:bg-stone-200/50 hover:text-stone-900"
             }`}
           >
             {label}
-          </a>
+          </Link>
         ))}
       </nav>
     </aside>
   );
 }
+
