@@ -27,6 +27,20 @@ class EventAppend(BaseModel):
     details: Optional[dict[str, Any]] = None
 
 
+VALID_STATUSES = {"queued", "running", "review_required", "completed", "disputed"}
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in VALID_STATUSES:
+            raise ValueError(f"status must be one of {sorted(VALID_STATUSES)}")
+        return v
+
+
 VALID_OUTCOMES = {"recommended", "recommended_with_caveats", "not_recommended", "escalated"}
 RATIONALE_REQUIRED_FIELDS = (
     "primary_reason",
@@ -101,6 +115,11 @@ class CompleteResponse(BaseModel):
     task_id: str
     status: str
     audit_record: AuditRecordInfo
+
+
+class StatusUpdated(BaseModel):
+    task_id: str
+    status: str
 
 
 class TaskSummary(BaseModel):

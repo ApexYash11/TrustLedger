@@ -6,3 +6,6 @@ venv/
 node_modules/
 .next/
 .env
+frontend/build.log
+frontend/dev.log
+frontend/build-err.txt

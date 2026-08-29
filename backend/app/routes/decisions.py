@@ -17,6 +17,8 @@ from ..schemas import (
     ReplayIntegrity,
     ReplayResponse,
     ReplayStep,
+    StatusUpdate,
+    StatusUpdated,
     TaskSummary,
     VerifyResponse,
 )
@@ -40,6 +42,19 @@ def _get_task_or_404(db: Session, task_id: str) -> Task:
 
 def _is_sealed(db: Session, task_id: str) -> bool:
     return db.query(AuditRecord).filter(AuditRecord.task_id == task_id).first() is not None
+
+
+@router.patch("/{task_id}/status", response_model=StatusUpdated)
+def update_task_status(task_id: str, payload: StatusUpdate, db: Session = Depends(get_db)):
+    task = _get_task_or_404(db, task_id)
+    if _is_sealed(db, task_id):
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "Task is sealed to the audit chain and can no longer be modified", "code": "TASK_SEALED"},
+        )
+    task.status = payload.status
+    db.commit()
+    return StatusUpdated(task_id=task.task_id, status=task.status)
 
 
 @router.post("/start", response_model=DecisionStartResponse)
