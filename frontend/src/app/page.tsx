@@ -76,6 +76,33 @@ export default function DashboardPage() {
       });
   };
 
+  /** Handle status change from the kebab menu (e.g. Mark Disputed). */
+  const handleStatusChange = (taskId: string, newStatus: string) => {
+    const previous = data.decisions.find((d) => d.task_id === taskId)?.status;
+    if (previous === newStatus) return;
+    // Optimistic local update
+    setData((prev) => ({
+      ...prev,
+      decisions: prev.decisions.map((d) =>
+        d.task_id === taskId ? { ...d, status: newStatus } : d
+      ),
+    }));
+    // Persist to backend
+    api
+      .updateDecisionStatus(taskId, newStatus)
+      .catch(() => {
+        // Revert on failure
+        if (previous) {
+          setData((prev) => ({
+            ...prev,
+            decisions: prev.decisions.map((d) =>
+              d.task_id === taskId ? { ...d, status: previous } : d
+            ),
+          }));
+        }
+      });
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -127,7 +154,7 @@ export default function DashboardPage() {
                       onDragEnd={() => setDragId(null)}
                       className={dragId === card.task_id ? "dragging" : ""}
                     >
-                      <TaskCard card={card} />
+                      <TaskCard card={card} onStatusChange={handleStatusChange} />
                     </div>
                   ))}
 
