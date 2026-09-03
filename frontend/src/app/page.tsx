@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, DecisionListResponse, TaskSummary } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, ApiError, DecisionListResponse, TaskSummary } from "@/lib/api";
 import TaskCard from "@/components/TaskCard";
 import Sidebar from "@/components/Sidebar";
 
@@ -34,10 +34,18 @@ export default function DashboardPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
+  /** Track in-flight drags so the auto-refresh can skip while dragging. */
+  const isDraggingRef = useRef(false);
+
   const refresh = useCallback(() => {
+    // Don't overwrite optimistic state while a drag-and-drop is in progress
+    if (isDraggingRef.current) return;
     api
       .listDecisions()
-      .then((res) => setData(res))
+      .then((res) => {
+        // Guard again in case drag started between fetch and resolve
+        if (!isDraggingRef.current) setData(res);
+      })
       .catch(() => {});
   }, []);
 
@@ -50,7 +58,15 @@ export default function DashboardPage() {
   const onDrop = (col: string) => {
     if (!dragId) return;
     const taskId = dragId;
+    // Capture previous status BEFORE the optimistic update
     const previous = data.decisions.find((d) => d.task_id === taskId)?.status;
+    // If the card is dropped on its current column, no-op
+    if (previous === col) {
+      setDragId(null);
+      setDragOverCol(null);
+      isDraggingRef.current = false;
+      return;
+    }
     // Optimistic local move
     setData((prev) => ({
       ...prev,
@@ -60,18 +76,22 @@ export default function DashboardPage() {
     }));
     setDragId(null);
     setDragOverCol(null);
+    isDraggingRef.current = false;
     // Persist to backend so the next refresh keeps the card in its new column
     api
       .updateDecisionStatus(taskId, col)
-      .catch(() => {
-        // Revert on failure (e.g. demo mode or sealed record)
-        if (previous) {
-          setData((prev) => ({
-            ...prev,
-            decisions: prev.decisions.map((d) =>
-              d.task_id === taskId ? { ...d, status: previous } : d
-            ),
-          }));
+      .catch((err: unknown) => {
+        // Always revert on failure — don't gate on previous truthiness
+        const revertStatus = previous ?? col;
+        setData((prev) => ({
+          ...prev,
+          decisions: prev.decisions.map((d) =>
+            d.task_id === taskId ? { ...d, status: revertStatus } : d
+          ),
+        }));
+        // Show user-visible feedback for sealed-record rejection
+        if (err instanceof ApiError && err.status === 409) {
+          alert(`Cannot move "${taskId}": this record is sealed to the audit chain.`);
         }
       });
   };
@@ -123,8 +143,8 @@ export default function DashboardPage() {
                     <div
                       key={card.task_id}
                       draggable
-                      onDragStart={() => setDragId(card.task_id)}
-                      onDragEnd={() => setDragId(null)}
+                      onDragStart={() => { setDragId(card.task_id); isDraggingRef.current = true; }}
+                      onDragEnd={() => { setDragId(null); isDraggingRef.current = false; }}
                       className={dragId === card.task_id ? "dragging" : ""}
                     >
                       <TaskCard card={card} />

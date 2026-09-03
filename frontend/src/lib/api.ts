@@ -1,5 +1,15 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
+/** Custom error that preserves the HTTP status code for callers to inspect. */
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, path: string) {
+    super(`API error ${status}: ${path}`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export interface TaskSummary {
   task_id: string;
   case_id: string;
@@ -102,7 +112,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
     });
   }
   const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  if (!res.ok) throw new ApiError(res.status, path);
   return res.json();
 }
 
@@ -113,7 +123,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  if (!res.ok) throw new ApiError(res.status, path);
   return res.json();
 }
 
