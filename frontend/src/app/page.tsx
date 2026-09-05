@@ -31,6 +31,8 @@ const DEMO: DecisionListResponse = {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DecisionListResponse>(DEMO);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
@@ -44,9 +46,26 @@ export default function DashboardPage() {
       .listDecisions()
       .then((res) => {
         // Guard again in case drag started between fetch and resolve
-        if (!isDraggingRef.current) setData(res);
+        if (!isDraggingRef.current) {
+          setData(res);
+          setErrorMessage(null);
+          setIsOffline(false);
+        }
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          // Backend is reachable but returned an application/API error
+          setErrorMessage(`API error ${err.status}: unable to load live decisions`);
+          setIsOffline(false);
+          // Do NOT silently fall back to static DEMO data on API error
+          setData({ total: 0, decisions: [] });
+        } else {
+          // Backend genuinely unreachable (network / connection error)
+          setErrorMessage(null);
+          setIsOffline(true);
+          setData(DEMO);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -108,6 +127,22 @@ export default function DashboardPage() {
           Add Task
         </button>
       </div>
+        {errorMessage && (
+          <div
+            id="backend-error-banner"
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700"
+          >
+            <span className="font-semibold">Backend Error:</span> {errorMessage}
+          </div>
+        )}
+        {isOffline && (
+          <div
+            id="offline-fallback-banner"
+            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-[12px] text-amber-800"
+          >
+            Backend unreachable — showing read-only offline demo dataset.
+          </div>
+        )}
         {/* Board */}
         <div className="grid grid-cols-4 gap-4">
           {COLUMNS.map((col) => {
