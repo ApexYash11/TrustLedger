@@ -5,11 +5,6 @@ import { usePathname } from "next/navigation";
 
 const NAV = [
   { label: "Home", href: "/" },
-  { label: "My Task", href: "/tasks" },
-  { label: "Inbox", href: "/inbox" },
-  { label: "Project", href: "/project" },
-  { label: "Decisions", href: "/" },
-  { label: "Reports", href: "/reports" },
 ];
 
 export default function Sidebar() {
