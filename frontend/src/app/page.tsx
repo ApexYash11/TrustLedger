@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, DecisionListResponse, TaskSummary } from "@/lib/api";
+import { DEMO_CARDS } from "@/lib/demoData";
 import TaskCard from "@/components/TaskCard";
 import Sidebar from "@/components/Sidebar";
 
@@ -13,24 +14,9 @@ const COLUMN_LABELS: Record<string, string> = {
   completed: "Completed",
 };
 
-/* Preview data: static cards shown alongside live data so the board layout
-   can be evaluated as it will look with a full live agent run. */
 const DEMO: DecisionListResponse = {
-  total: 12,
-  decisions: [
-    { task_id: "demo-1041", case_id: "Vendor Due Diligence - Acme Corp", case_type: "Due Diligence", agent_name: "Scout Agent", status: "queued", risk_level: "medium", outcome: null, outcome_summary: "Financials, litigation history and beneficial ownership checks queued for the research pipeline.", duration_seconds: null, human_review_status: null, created_at: "2026-08-28T10:00:00Z" },
-    { task_id: "demo-1042", case_id: "Sanctions Screening Refresh", case_type: "Compliance", agent_name: "Compliance Bot", status: "queued", risk_level: "low", outcome: null, outcome_summary: "Periodic re-screen of the counterparty against updated OFAC, EU and UN watchlists.", duration_seconds: null, human_review_status: null, created_at: "2026-08-28T09:15:00Z" },
-    { task_id: "demo-1037", case_id: "Market Entry Study - Quick Commerce", case_type: "Market Entry", agent_name: "Research Agent Alpha", status: "running", risk_level: "high", outcome: null, outcome_summary: "Agent is mapping competitor dark-store density and delivery-fee economics across tier-1 cities.", duration_seconds: 320, human_review_status: null, created_at: "2026-08-27T09:30:00Z" },
-    { task_id: "demo-1038", case_id: "Regulatory Scan - Lending Norms", case_type: "Regulatory", agent_name: "Policy Scout", status: "running", risk_level: "medium", outcome: null, outcome_summary: "Tracking RBI circulars on unsecured lending and their impact on the proposed credit line.", duration_seconds: 480, human_review_status: null, created_at: "2026-08-27T08:10:00Z" },
-    { task_id: "demo-1029", case_id: "Cyber Risk Assessment - Insurance", case_type: "Risk Assessment", agent_name: "Risk Agent", status: "review_required", risk_level: "high", outcome: "escalated", outcome_summary: "Escalated: conflicting findings on third-party API exposure; routed for partner review.", duration_seconds: 95, human_review_status: "pending", created_at: "2026-08-27T11:00:00Z" },
-    { task_id: "demo-1031", case_id: "ESG Disclosure Readiness - Cement", case_type: "ESG", agent_name: "Compliance Bot", status: "review_required", risk_level: "medium", outcome: "approved_with_notes", outcome_summary: "BRSR disclosures achievable with proposed emissions data; two gaps flagged for notes.", duration_seconds: 210, human_review_status: "pending", created_at: "2026-08-27T10:20:00Z" },
-    { task_id: "demo-1026", case_id: "Market Entry Assessment - EV Charging", case_type: "Market Entry", agent_name: "Scout Agent", status: "review_required", risk_level: "high", outcome: "conditional", outcome_summary: "Conditional recommendation: enter via a phased pilot in the Jaipur-Udaipur corridor.", duration_seconds: 400, human_review_status: "pending", created_at: "2026-08-25T14:45:00Z" },
-    { task_id: "demo-1020", case_id: "Pricing Analysis - Quick Commerce", case_type: "Pricing", agent_name: "Vision Agent", status: "completed", risk_level: "low", outcome: "approved", outcome_summary: "Recommended: 6-minute delivery fee of ₹19 maximizes retention without breaching the ₹24 cost floor.", duration_seconds: 145, human_review_status: "approved", created_at: "2026-08-27T10:00:00Z" },
-    { task_id: "demo-1023", case_id: "ESG Disclosure Readiness - Cement", case_type: "ESG", agent_name: "Wireframe Bot", status: "completed", risk_level: "medium", outcome: "approved", outcome_summary: "Recommended: FY27 BRSR disclosures are achievable with the proposed emissions data model.", duration_seconds: 189, human_review_status: "approved", created_at: "2026-08-27T09:00:00Z" },
-    { task_id: "demo-1017", case_id: "Cost Optimization Study - Manufacturing", case_type: "Cost Analysis", agent_name: "Research Agent Alpha", status: "completed", risk_level: "low", outcome: "approved", outcome_summary: "Recommended: adopt the two-shift layout; validated ₹3.4 crore annual saving with no capex.", duration_seconds: 160, human_review_status: "approved", created_at: "2026-08-27T08:30:00Z" },
-    { task_id: "demo-1013", case_id: "Regulatory Scan - Data Privacy", case_type: "Regulatory", agent_name: "Policy Scout", status: "completed", risk_level: "medium", outcome: "rejected", outcome_summary: "Not recommended: launch the wallet feature only after DPDP compliance sign-off on the consent flow.", duration_seconds: 230, human_review_status: "approved", created_at: "2026-08-26T16:00:00Z" },
-    { task_id: "demo-1011", case_id: "M&A Screening - Logistics Target", case_type: "M&A Screening", agent_name: "Scout Agent", status: "completed", risk_level: "high", outcome: "escalated", outcome_summary: "Escalated: target's pending tax litigation materially changes the valuation band; partner sign-off needed.", duration_seconds: 310, human_review_status: "approved", created_at: "2026-08-25T12:00:00Z" },
-  ] as TaskSummary[],
+  total: DEMO_CARDS.length,
+  decisions: DEMO_CARDS,
 };
 
 
@@ -90,7 +76,7 @@ export default function DashboardPage() {
     api
       .updateDecisionStatus(taskId, col)
       .catch((err: unknown) => {
-        // Always revert on failure — don't gate on previous truthiness
+        // Always revert on failure â€” don't gate on previous truthiness
         const revertStatus = previous ?? col;
         setData((prev) => ({
           ...prev,

@@ -7,6 +7,7 @@ import IntegrityPanel from "@/components/IntegrityPanel";
 import ReplayViewer from "@/components/ReplayViewer";
 import Sidebar from "@/components/Sidebar";
 import { api, FullDecisionRecord } from "@/lib/api";
+import { getDemoRecord } from "@/lib/demoData";
 import { formatTimestamp, humanize } from "@/lib/format";
 
 // Plain dash instead of em-dash (flagged by writing-quality checkers).
@@ -170,6 +171,12 @@ export default function DecisionDetailPage() {
     if (!taskId) return;
     setRecord(null);
     setError(null);
+    // Static preview records (demo-*) are served locally, not from the API.
+    const demo = getDemoRecord(taskId);
+    if (demo) {
+      setRecord(demo);
+      return;
+    }
     api
       .getDecision(taskId)
       .then(setRecord)

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, ReplayResponse } from "@/lib/api";
+import { getDemoReplay } from "@/lib/demoData";
 import { formatTimestamp, humanize } from "@/lib/format";
 
 export default function ReplayViewer({ taskId }: { taskId: string }) {
@@ -21,7 +22,12 @@ export default function ReplayViewer({ taskId }: { taskId: string }) {
         if (active) setReplay(response);
       })
       .catch(() => {
-        if (active) setError("Unable to load replay data.");
+        // Static preview records (demo-*) are served locally, not from the API.
+        const demo = getDemoReplay(taskId);
+        if (active) {
+          if (demo) setReplay(demo);
+          else setError("Unable to load replay data.");
+        }
       });
 
     return () => {
