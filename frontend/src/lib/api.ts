@@ -3,11 +3,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1
 /** Custom error that preserves the HTTP status code for callers to inspect. */
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, path: string) {
+  code?: string;
+
+  constructor(status: number, path: string, code?: string) {
     super(`API error ${status}: ${path}`);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
+}
+
+async function apiError(res: Response, path: string): Promise<ApiError> {
+  const payload = await res.json().catch(() => null);
+  const detail = payload?.detail ?? payload;
+  return new ApiError(res.status, path, typeof detail?.code === "string" ? detail.code : undefined);
 }
 
 export interface TaskSummary {
@@ -112,7 +121,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
     });
   }
   const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) throw new ApiError(res.status, path);
+  if (!res.ok) throw await apiError(res, path);
   return res.json();
 }
 
@@ -123,8 +132,13 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
     cache: "no-store",
   });
-  if (!res.ok) throw new ApiError(res.status, path);
+  if (!res.ok) throw await apiError(res, path);
   return res.json();
+}
+
+async function del(path: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, { method: "DELETE", cache: "no-store" });
+  if (!res.ok) throw await apiError(res, path);
 }
 
 export const api = {
@@ -135,4 +149,5 @@ export const api = {
   verifyDecision: (taskId: string) => get<VerifyResponse>(`/decisions/${taskId}/verify`),
   updateDecisionStatus: (taskId: string, status: string) =>
     patch<{ task_id: string; status: string }>(`/decisions/${taskId}/status`, { status }),
+  deleteDecision: (taskId: string) => del(`/decisions/${taskId}`),
 };

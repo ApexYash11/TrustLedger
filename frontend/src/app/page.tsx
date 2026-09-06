@@ -33,6 +33,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<DecisionListResponse>(DEMO);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<TaskSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   /** Track in-flight drags so the auto-refresh can skip while dragging. */
   const isDraggingRef = useRef(false);
@@ -96,6 +99,28 @@ export default function DashboardPage() {
       });
   };
 
+  const confirmDelete = async () => {
+    if (!deleteCandidate || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteDecision(deleteCandidate.task_id);
+      setData((previous) => ({
+        decisions: previous.decisions.filter((card) => card.task_id !== deleteCandidate.task_id),
+        total: Math.max(0, previous.total - 1),
+      }));
+      setDeleteCandidate(null);
+    } catch (err: unknown) {
+      setDeleteError(
+        err instanceof ApiError && err.status === 409 && err.code === "TASK_SEALED"
+          ? "This task has been sealed on the hash chain and cannot be deleted."
+          : "Unable to delete this task. Please try again."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -147,7 +172,7 @@ export default function DashboardPage() {
                       onDragEnd={() => { setDragId(null); isDraggingRef.current = false; }}
                       className={dragId === card.task_id ? "dragging" : ""}
                     >
-                      <TaskCard card={card} />
+                      <TaskCard card={card} onDelete={(selected) => { setDeleteError(null); setDeleteCandidate(selected); }} />
                     </div>
                   ))}
 
@@ -160,6 +185,35 @@ export default function DashboardPage() {
           })}
         </div>
       </main>
+      {deleteCandidate && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-stone-950/30 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-task-title">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 id="delete-task-title" className="text-lg font-semibold text-stone-900">Delete task?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-stone-600">
+              Delete <span className="font-medium text-stone-800">{deleteCandidate.case_id}</span>? This cannot be undone.
+            </p>
+            {deleteError && <p role="alert" className="mt-3 text-sm text-red-600">{deleteError}</p>}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => { setDeleteCandidate(null); setDeleteError(null); }}
+                className="rounded-md border border-stone-300 px-3.5 py-2 text-sm font-medium text-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
