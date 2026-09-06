@@ -52,7 +52,7 @@ export default function DecisionTimeline({ events }: { events: EventOut[] }) {
               {policy && (
                 <div className="mt-3 rounded-md bg-stone-50 p-3 text-sm">
                   <p className="font-medium text-stone-800">
-                    Policy: {[policy.section, policy.title].filter(Boolean).join(" — ") || "Referenced policy"}
+                    Policy: {[policy.section, policy.title].filter(Boolean).join(" - ") || "Referenced policy"}
                   </p>
                   {policy.application && <p className="mt-1 text-stone-600">Applied: {policy.application}</p>}
                 </div>

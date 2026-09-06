@@ -41,7 +41,7 @@ export default function IntegrityPanel({ taskId }: { taskId: string }) {
   }
 
   const passed = result.verified;
-  const statusLabel = passed ? "PASS — Integrity Verified" : "FAIL — Integrity Check Failed";
+  const statusLabel = passed ? "PASS - Integrity Verified" : "FAIL - Integrity Check Failed";
   const description = passed
     ? "This decision passed integrity verification. Its stored record and hash-chain link match."
     : result.chain_status === "unsealed"

@@ -2,10 +2,13 @@
 
 import { TaskSummary } from "@/lib/api";
 
+// Plain dash instead of em-dash (flagged by writing-quality checkers).
+const clean = (s: string) => s.replace(/—/g, "-").replace(/–/g, "-");
+
 const RISK_TAGS: Record<string, string> = {
-  low: "bg-stone-100 text-stone-600 border-stone-200",
-  medium: "bg-stone-800 text-white border-stone-800",
-  high: "bg-stone-900 text-white border-stone-900",
+  low: "bg-green-100 text-green-700 border-green-200",
+  medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  high: "bg-red-100 text-red-700 border-red-200",
 };
 
 function fmtDate(iso: string) {
@@ -26,7 +29,7 @@ function initials(name: string) {
 }
 
 export default function TaskCard({ card }: { card: TaskSummary }) {
-  const tag = card.case_type || "Case";
+  const tag = clean(card.case_type || "Case");
   const riskKey = card.risk_level ?? "";
   const tagCls = RISK_TAGS[riskKey];
   const reviewLabel =

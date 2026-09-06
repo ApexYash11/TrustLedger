@@ -93,7 +93,7 @@ export default function ReplayViewer({ taskId }: { taskId: string }) {
         {step.policies.map((policy, index) => (
           <div key={`${policy.section}-${index}`} className="mt-4 rounded-md bg-stone-50 p-3 text-sm">
             <p className="font-medium text-stone-800">
-              Policy: {[policy.section, policy.title].filter(Boolean).join(" — ") || "Referenced policy"}
+              Policy: {[policy.section, policy.title].filter(Boolean).join(" - ") || "Referenced policy"}
             </p>
             {policy.text_excerpt && <p className="mt-1 text-stone-600">{policy.text_excerpt}</p>}
             {policy.application && <p className="mt-2 text-stone-600">Applied: {policy.application}</p>}
