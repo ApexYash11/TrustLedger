@@ -8,7 +8,7 @@
 
 ## 1. One-Paragraph Status
 
-The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with 12/12 automated tests passing and a live end-to-end smoke test completed. The frontend scaffold (Next.js + Tailwind) has a working Kanban Command Center and a decision detail page. Everything is on branch `yash` under PR #1, pending team merge. The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: full Replay/Integrity UI (Week 3), tamper demo + rehearsal (Week 4).
+The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with 12/12 automated tests passing and a live end-to-end smoke test completed. The frontend scaffold (Next.js + Tailwind) has a working Kanban Command Center and a decision detail page. Everything is on branch `yash` under PR #1, pending team merge. The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: tamper demo + rehearsal (Week 4).
 
 ---
 
