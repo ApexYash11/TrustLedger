@@ -1,11 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import app
+from app.models import AuditRecord, Decision, DecisionEvent, Task, new_uuid, utcnow
+from app.routes.decisions import delete_decision
 
 engine = create_engine(
     "sqlite://",
@@ -189,6 +192,103 @@ def test_event_after_seal_conflict(agent_id):
         json={"event_type": "data_retrieved", "summary": "late event"},
     )
     assert resp.status_code == 409
+
+
+def test_delete_unsealed_task_removes_all_dependent_records(agent_id):
+    task_id = _start_task(agent_id).json()["task_id"]
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            Decision(
+                decision_id=new_uuid(),
+                task_id=task_id,
+                outcome="recommended",
+                outcome_summary="Unsealed draft decision",
+                structured_rationale={"primary_reason": "draft"},
+                decided_at=utcnow(),
+            )
+        )
+        db.add(
+            DecisionEvent(
+                event_id=new_uuid(),
+                task_id=task_id,
+                sequence=2,
+                event_type="decision_draft",
+                summary="A draft decision was created",
+                actor="agent",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.delete(f"/api/v1/decisions/{task_id}")
+    assert response.status_code == 204
+    assert response.content == b""
+
+    db = TestingSessionLocal()
+    try:
+        assert db.query(Task).filter_by(task_id=task_id).count() == 0
+        assert db.query(Decision).filter_by(task_id=task_id).count() == 0
+        assert db.query(DecisionEvent).filter_by(task_id=task_id).count() == 0
+        assert db.query(AuditRecord).filter_by(task_id=task_id).count() == 0
+    finally:
+        db.close()
+
+
+def test_delete_sealed_task_returns_conflict_without_changing_records(agent_id):
+    task_id = _start_task(agent_id).json()["task_id"]
+    _log_events(task_id)
+    _complete(task_id)
+
+    response = client.delete(f"/api/v1/decisions/{task_id}")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "TASK_SEALED"
+
+    db = TestingSessionLocal()
+    try:
+        assert db.query(Task).filter_by(task_id=task_id).count() == 1
+        assert db.query(Decision).filter_by(task_id=task_id).count() == 1
+        assert db.query(DecisionEvent).filter_by(task_id=task_id).count() > 0
+        assert db.query(AuditRecord).filter_by(task_id=task_id).count() == 1
+    finally:
+        db.close()
+
+
+def test_delete_rolls_back_when_the_transaction_fails(agent_id, monkeypatch):
+    task_id = _start_task(agent_id).json()["task_id"]
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            Decision(
+                decision_id=new_uuid(),
+                task_id=task_id,
+                outcome="recommended",
+                outcome_summary="Unsealed draft decision",
+                structured_rationale={"primary_reason": "draft"},
+                decided_at=utcnow(),
+            )
+        )
+        db.commit()
+
+        def failing_commit():
+            raise SQLAlchemyError("simulated transaction failure")
+
+        monkeypatch.setattr(db, "commit", failing_commit)
+        with pytest.raises(SQLAlchemyError, match="simulated transaction failure"):
+            delete_decision(task_id, db)
+
+        assert db.query(Task).filter_by(task_id=task_id).count() == 1
+        assert db.query(Decision).filter_by(task_id=task_id).count() == 1
+        assert db.query(DecisionEvent).filter_by(task_id=task_id).count() == 1
+    finally:
+        db.close()
+
+
+def test_delete_unknown_task_returns_not_found():
+    response = client.delete("/api/v1/decisions/not-a-task")
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "TASK_NOT_FOUND"
 
 
 def test_complete_requires_rationale_fields(agent_id):
