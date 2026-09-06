@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { TaskSummary } from "@/lib/api";
 
 // Plain dash instead of em-dash (flagged by writing-quality checkers).
@@ -29,9 +30,11 @@ function initials(name: string) {
 }
 
 export default function TaskCard({ card }: { card: TaskSummary }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const tag = clean(card.case_type || "Case");
   const riskKey = card.risk_level ?? "";
   const tagCls = RISK_TAGS[riskKey];
+  const summary = card.outcome_summary ?? card.outcome?.replace(/_/g, " ") ?? null;
   const reviewLabel =
     card.human_review_status === "pending"
       ? "In review"
@@ -43,9 +46,9 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
     <a
       href={`/decisions/${card.task_id}`}
       draggable
-      className="card-hover block cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
+      className="card-hover relative block cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
     >
-      <div className="mb-2.5 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
             {tag}
@@ -56,13 +59,57 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
             </span>
           )}
         </div>
-        <span className="text-stone-300 hover:text-stone-500">...</span>
+        <button
+          type="button"
+          aria-label="Card options"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenuOpen((v) => !v);
+          }}
+          className="rounded px-1.5 text-stone-300 transition-colors hover:bg-stone-100 hover:text-stone-600"
+        >
+          ...
+        </button>
       </div>
 
-      <h3 className="mb-1.5 text-sm font-semibold leading-snug text-stone-900">{card.case_id}</h3>
-      <p className="mb-4 line-clamp-2 text-[13px] leading-relaxed text-stone-500">
-        {card.outcome_summary ?? card.outcome?.replace(/_/g, " ") ?? "No summary recorded yet."}
-      </p>
+      {menuOpen && (
+        <div
+          className="absolute right-2 top-8 z-20 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-lg"
+          onMouseLeave={() => setMenuOpen(false)}
+        >
+          <span
+            className="block cursor-pointer px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.location.href = `/decisions/${card.task_id}`;
+            }}
+          >
+            Open decision
+          </span>
+          <span
+            className="block cursor-pointer px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigator.clipboard
+                ?.writeText(`${window.location.origin}/decisions/${card.task_id}`)
+                .catch(() => {});
+              setMenuOpen(false);
+            }}
+          >
+            Copy link
+          </span>
+        </div>
+      )}
+
+      <h3 className="mb-1 text-base font-semibold leading-snug tracking-tight text-stone-900">
+        {card.case_id}
+      </h3>
+      {summary && (
+        <p className="mb-4 line-clamp-2 text-[13px] leading-relaxed text-stone-500">{summary}</p>
+      )}
 
       <div className="flex items-center justify-between text-xs text-stone-400">
         <div className="flex items-center gap-2">
