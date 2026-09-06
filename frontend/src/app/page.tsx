@@ -1,8 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, DecisionListResponse, TaskSummary } from "@/lib/api";
-import { DEMO_CARDS } from "@/lib/demoData";
 import TaskCard from "@/components/TaskCard";
 import Sidebar from "@/components/Sidebar";
 
@@ -14,17 +13,28 @@ const COLUMN_LABELS: Record<string, string> = {
   completed: "Completed",
 };
 
+/* Demo data so the design renders even when the backend is offline */
 const DEMO: DecisionListResponse = {
-  total: DEMO_CARDS.length,
-  decisions: DEMO_CARDS,
+  total: 8,
+  decisions: [
+    { task_id: "t-1041", case_id: "Vendor Due Diligence - Acme Corp", case_type: "Clients", agent_name: "Scout Agent", status: "queued", risk_level: null, outcome: null, outcome_summary: "Engagement queued for research agent run; waiting in the processing pipeline.", duration_seconds: null, human_review_status: null, created_at: "2026-08-20T10:00:00Z" },
+    { task_id: "t-1042", case_id: "Sanctions Screening Refresh", case_type: "Compliance", agent_name: "Compliance Bot", status: "queued", risk_level: null, outcome: null, outcome_summary: "Periodic re-screen of the counterparty watchlist with fresh list data.", duration_seconds: null, human_review_status: null, created_at: "2026-08-21T10:00:00Z" },
+    { task_id: "t-1037", case_id: "Review Mobile App Redesign", case_type: "Offices work", agent_name: "Research Agent Alpha", status: "running", risk_level: null, outcome: null, outcome_summary: "Agent is evaluating and refining the updated design of a mobile application across key flows.", duration_seconds: 320, human_review_status: null, created_at: "2026-08-18T09:30:00Z" },
+    { task_id: "t-1038", case_id: "Check User Flow Health App", case_type: "Personal", agent_name: "Flow Analyzer", status: "running", risk_level: null, outcome: null, outcome_summary: "Analyzing the sequence of steps users take within the health app onboarding funnel.", duration_seconds: 480, human_review_status: null, created_at: "2026-08-17T14:00:00Z" },
+    { task_id: "t-1029", case_id: "Research Best Practices", case_type: "Personal", agent_name: "Policy Scout", status: "review_required", risk_level: "medium", outcome: "escalated", outcome_summary: "Flagged for human review - recommendation conflicts with an existing policy reference.", duration_seconds: 95, human_review_status: "pending", created_at: "2026-08-12T11:00:00Z" },
+    { task_id: "t-1031", case_id: "Develop UI Concepts Agency", case_type: "Clients", agent_name: "Design Agent", status: "review_required", risk_level: "low", outcome: "approved_with_notes", outcome_summary: "User-centered interface concepts tailored specifically to the client brand system.", duration_seconds: 210, human_review_status: "pending", created_at: "2026-08-13T11:00:00Z" },
+    { task_id: "t-1020", case_id: "Design Skill Tree Visualization", case_type: "Project", agent_name: "Vision Agent", status: "completed", risk_level: "low", outcome: "approved", outcome_summary: "Structured visualization generated and sealed to the tamper-evident audit chain.", duration_seconds: 145, human_review_status: "approved", created_at: "2026-08-05T10:00:00Z" },
+    { task_id: "t-1023", case_id: "Create Wireframe Website", case_type: "Project", agent_name: "Wireframe Bot", status: "completed", risk_level: "low", outcome: "approved", outcome_summary: "Foundational wireframe layout produced, replayable end-to-end with evidence.", duration_seconds: 189, human_review_status: "approved", created_at: "2026-08-06T10:00:00Z" },
+  ] as TaskSummary[],
 };
 
 
 export default function DashboardPage() {
   const [data, setData] = useState<DecisionListResponse>(DEMO);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
-  const [modalCol, setModalCol] = useState<string | null>(null);
 
   /** Track in-flight drags so the auto-refresh can skip while dragging. */
   const isDraggingRef = useRef(false);
@@ -36,12 +46,26 @@ export default function DashboardPage() {
       .listDecisions()
       .then((res) => {
         // Guard again in case drag started between fetch and resolve
-        if (!isDraggingRef.current)
-          // Static preview cards are kept alongside live data so the board
-          // layout can be evaluated as it will look with a full agent run.
-          setData({ total: res.total + DEMO.decisions.length, decisions: [...DEMO.decisions, ...res.decisions] });
+        if (!isDraggingRef.current) {
+          setData(res);
+          setErrorMessage(null);
+          setIsOffline(false);
+        }
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          // Backend is reachable but returned an application/API error
+          setErrorMessage(`API error ${err.status}: unable to load live decisions`);
+          setIsOffline(false);
+          // Do NOT silently fall back to static DEMO data on API error
+          setData({ total: 0, decisions: [] });
+        } else {
+          // Backend genuinely unreachable (network / connection error)
+          setErrorMessage(null);
+          setIsOffline(true);
+          setData(DEMO);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -76,7 +100,7 @@ export default function DashboardPage() {
     api
       .updateDecisionStatus(taskId, col)
       .catch((err: unknown) => {
-        // Always revert on failure â€” don't gate on previous truthiness
+        // Always revert on failure — don't gate on previous truthiness
         const revertStatus = previous ?? col;
         setData((prev) => ({
           ...prev,
@@ -91,26 +115,6 @@ export default function DashboardPage() {
       });
   };
 
-  const addTask = (col: string, title: string, caseType: string) => {
-    const newCard: TaskSummary = {
-      task_id: `local-${Date.now()}`,
-      case_id: title,
-      case_type: caseType || "Research",
-      agent_name: "Unassigned",
-      status: col,
-      risk_level: null,
-      outcome: null,
-      outcome_summary: null,
-      duration_seconds: null,
-      human_review_status: null,
-      created_at: new Date().toISOString(),
-    };
-    setData((prev) => ({
-      total: prev.total + 1,
-      decisions: [newCard, ...prev.decisions],
-    }));
-  };
-
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -119,13 +123,26 @@ export default function DashboardPage() {
         <h1 className="text-[22px] font-bold tracking-tight text-stone-900">
           Research Command Center
         </h1>
-        <button
-          onClick={() => setModalCol("queued")}
-          className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700"
-        >
+        <button className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700">
           Add Task
         </button>
       </div>
+        {errorMessage && (
+          <div
+            id="backend-error-banner"
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700"
+          >
+            <span className="font-semibold">Backend Error:</span> {errorMessage}
+          </div>
+        )}
+        {isOffline && (
+          <div
+            id="offline-fallback-banner"
+            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-[12px] text-amber-800"
+          >
+            Backend unreachable — showing read-only offline demo dataset.
+          </div>
+        )}
         {/* Board */}
         <div className="grid grid-cols-4 gap-4">
           {COLUMNS.map((col) => {
@@ -151,20 +168,8 @@ export default function DashboardPage() {
                     </span>
                   </h2>
                   <div className="flex items-center gap-1 text-stone-400">
-                    <button
-                      title="Add task to this column"
-                      onClick={() => setModalCol(col)}
-                      className="rounded px-1.5 hover:bg-stone-200 hover:text-stone-700"
-                    >
-                      +
-                    </button>
-                    <button
-                      title="More options"
-                      onClick={() => setModalCol(col)}
-                      className="rounded px-1.5 hover:bg-stone-200 hover:text-stone-700"
-                    >
-                      ...
-                    </button>
+                    <button className="rounded px-1.5 hover:bg-stone-200 hover:text-stone-700">+</button>
+                    <button className="rounded px-1.5 hover:bg-stone-200 hover:text-stone-700">...</button>
                   </div>
                 </div>
 
@@ -181,10 +186,7 @@ export default function DashboardPage() {
                     </div>
                   ))}
 
-                  <button
-                    onClick={() => setModalCol(col)}
-                    className="w-full rounded-lg border border-dashed border-stone-200 py-3.5 text-[13px] text-stone-400 transition-colors hover:border-stone-400 hover:text-stone-600"
-                  >
+                  <button className="w-full rounded-lg border border-dashed border-stone-200 py-3.5 text-[13px] text-stone-400 transition-colors hover:border-stone-400 hover:text-stone-600">
                     Add Task
                   </button>
                 </div>
@@ -193,70 +195,6 @@ export default function DashboardPage() {
           })}
         </div>
       </main>
-      {modalCol && (
-        <NewTaskModal col={modalCol} onClose={() => setModalCol(null)} onCreate={addTask} />
-      )}
-    </div>
-  );
-}
-
-function NewTaskModal({
-  col,
-  onClose,
-  onCreate,
-}: {
-  col: string;
-  onClose: () => void;
-  onCreate: (col: string, title: string, caseType: string) => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [caseType, setCaseType] = useState("");
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-4 text-base font-semibold tracking-tight text-stone-900">
-          New Task <span className="font-normal text-stone-400">in {COLUMN_LABELS[col]}</span>
-        </h2>
-        <label className="mb-1 block text-xs font-medium text-stone-500">Title</label>
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Vendor Due Diligence - Acme Corp"
-          className="mb-3 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
-        />
-        <label className="mb-1 block text-xs font-medium text-stone-500">Case type</label>
-        <input
-          value={caseType}
-          onChange={(e) => setCaseType(e.target.value)}
-          placeholder="e.g. Due Diligence"
-          className="mb-5 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-md border border-stone-200 px-3 py-1.5 text-[13px] font-medium text-stone-600 transition-colors hover:bg-stone-100"
-          >
-            Cancel
-          </button>
-          <button
-            disabled={!title.trim()}
-            onClick={() => {
-              onCreate(col, title.trim(), caseType.trim());
-              onClose();
-            }}
-            className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Create
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

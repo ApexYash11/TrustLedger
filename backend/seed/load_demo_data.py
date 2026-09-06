@@ -4,7 +4,7 @@ Usage:
     python -m seed.load_demo_data          # seed (refuses if data exists)
     python -m seed.load_demo_data --force  # wipe and reseed
 
-Produces 16 research tasks across all Kanban columns, including the hero case
+Produces 26 research tasks across all Kanban columns, including the hero case
 RES-2026-004821 and one pre-tampered record RES-2026-009999 for the
 integrity-fail demo. Prints a verification report at the end.
 """
@@ -23,9 +23,9 @@ from app.services.sealer import seal_record
 
 SEED_FILE = Path(__file__).parent / "demo_data.json"
 
-GENERATED_COMPLETED = 7
-GENERATED_QUEUED = 2
-GENERATED_RUNNING = 2
+GENERATED_COMPLETED = 13
+GENERATED_QUEUED = 4
+GENERATED_RUNNING = 4
 
 # Templates for generated completed cases (varied outcomes for Kanban realism)
 QUICK_TEMPLATES = [
@@ -48,9 +48,28 @@ QUICK_TEMPLATES = [
      "risk": "high", "outcome": "escalated",
      "summary": "Escalated: conflicting findings on third-party API exposure; routed for partner review before the report is issued.",
      "review": True},
+    {"case_id": "RES-2026-005615", "case_type": "Cross-Border Tax Advisory — Entity Restructuring", "client": "Infosys",
+     "risk": "high", "outcome": "escalated",
+     "summary": "Escalated: transfer pricing benchmark exceeds arm's length range; partner review required before filing.",
+     "review": True},
     {"case_id": "RES-2026-005644", "case_type": "Pricing Analysis — Quick Commerce", "client": "Zepto",
      "risk": "low", "outcome": "recommended",
      "summary": "Recommended: 6-minute delivery fee of ₹19 maximizes retention without breaching the ₹24 competitor band."},
+    {"case_id": "RES-2026-005650", "case_type": "Supply Chain Resilience — Semiconductors", "client": "Vedanta",
+     "risk": "medium", "outcome": "recommended_with_caveats",
+     "summary": "Recommended with caveats: dual-sourcing strategy satisfies SLA; fab timeline has 4-month variance."},
+    {"case_id": "RES-2026-005662", "case_type": "Workplace Policy Scan — Hybrid Norms", "client": "Wipro",
+     "risk": "low", "outcome": "recommended",
+     "summary": "Recommended: 3-day office cadence aligns with peer index across Tier-1 tech firms."},
+    {"case_id": "RES-2026-005675", "case_type": "Capital Allocation Strategy — Green Energy", "client": "Adani Green",
+     "risk": "low", "outcome": "recommended",
+     "summary": "Recommended: allocate 40% capex to hybrid solar-wind clusters; exceeds hurdle rate by 180 bps."},
+    {"case_id": "RES-2026-005688", "case_type": "Credit Risk Model Validation — Retail NBFC", "client": "Bajaj Finance",
+     "risk": "medium", "outcome": "recommended",
+     "summary": "Recommended: Tier-2 bureau score uplift validates default probability calibration."},
+    {"case_id": "RES-2026-005695", "case_type": "Brand Perception Due Diligence — D2C Acquisition", "client": "Mamaearth",
+     "risk": "medium", "outcome": "not_recommended",
+     "summary": "Not recommended: brand sentiment dropped 38% post-recall; customer acquisition cost unsustainable."},
 ]
 
 RUNNING_PARTIALS = [
@@ -67,6 +86,29 @@ RUNNING_PARTIALS = [
          ("data_retrieved", "RBI circular set verified current", "agent"),
          ("evidence_evaluated", "State-norms comparison table downloading, evaluation in progress", "system"),
      ]},
+    {"case_id": "RES-2026-005735", "case_type": "Anti-Money Laundering Rule Tuning", "client": "HDFC Bank",
+     "engagement_code": "ENG-2026-HB-012",
+     "events": [
+         ("data_retrieved", "Transaction monitoring thresholds retrieved", "agent"),
+         ("evidence_evaluated", "False positive reduction analysis in progress", "system"),
+     ]},
+    {"case_id": "RES-2026-005749", "case_type": "Carbon Offset Integrity Audit", "client": "Jindal Steel",
+     "engagement_code": "ENG-2026-JS-007",
+     "events": [
+         ("data_retrieved", "Registry verification logs downloaded", "agent"),
+         ("policy_retrieved", "Methodology DEL-RM-2026 Section 4.1 loaded", "agent"),
+     ]},
+]
+
+QUEUED_CASES = [
+    {"case_id": "RES-2026-005801", "case_type": "Market Entry Study — Quick Commerce", "client": "Blinkit",
+     "engagement_code": "ENG-2026-BK-006", "offset_min": 12},
+    {"case_id": "RES-2026-005814", "case_type": "Due Diligence — Fintech Target", "client": "Razorpay",
+     "engagement_code": "ENG-2026-RP-001", "offset_min": 8},
+    {"case_id": "RES-2026-005827", "case_type": "Corporate Governance Benchmark", "client": "Larsen & Toubro",
+     "engagement_code": "ENG-2026-LT-003", "offset_min": 5},
+    {"case_id": "RES-2026-005839", "case_type": "Post-Merger Synergy Realization", "client": "Air India",
+     "engagement_code": "ENG-2026-AI-005", "offset_min": 2},
 ]
 
 
@@ -364,8 +406,8 @@ def main():
         print("  done.")
 
         print(f"Generating {GENERATED_QUEUED} queued tasks...")
-        _seed_queued(db, agent, "RES-2026-005801", "Market Entry Study — Quick Commerce", "Blinkit", "ENG-2026-BK-006", now - timedelta(minutes=12))
-        _seed_queued(db, agent, "RES-2026-005814", "Due Diligence — Fintech Target", "Razorpay", "ENG-2026-RP-001", now - timedelta(minutes=5))
+        for qc in QUEUED_CASES:
+            _seed_queued(db, agent, qc["case_id"], qc["case_type"], qc["client"], qc["engagement_code"], now - timedelta(minutes=qc["offset_min"]))
         print("  done.")
 
         print("\nTampering RES-2026-009999 post-seal (integrity fail demo)...")
