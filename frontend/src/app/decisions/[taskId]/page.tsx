@@ -54,13 +54,7 @@ export default function DecisionDetailPage() {
   return (
     <main className="min-h-screen bg-[#faf9f7] text-stone-900">
       <div className="max-w-3xl mx-auto px-6 py-10 font-serif">
-        <a
-          href="/"
-          className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
-        >
-          ← Back to Command Center
-        </a>
-        <header className="mt-4 pb-6 border-b border-stone-200">
+        <header className="pb-6 border-b border-stone-200">
           <p className="text-xs uppercase tracking-[0.2em] text-stone-400">
             {task.case_type} · {task.status}
           </p>
