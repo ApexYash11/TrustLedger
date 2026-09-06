@@ -8,7 +8,7 @@
 
 ## 1. One-Paragraph Status
 
-The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with 12/12 automated tests passing and a live end-to-end smoke test completed. The frontend scaffold (Next.js + Tailwind) has a working Kanban Command Center and a decision detail page. Everything is on branch `yash` under PR #1, pending team merge. The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: full Replay/Integrity UI (Week 3), tamper demo + rehearsal (Week 4).
+The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with automated coverage and a live end-to-end smoke test completed. The frontend has a working Kanban Command Center and a four-tab Decision Overview (Summary, Decision Trail, Replay, and Integrity). The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: demo rehearsal and final polish.
 
 ---
 
@@ -71,7 +71,10 @@ TrustLedger/  (branch: yash → PR #1 → main)
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/app/page.tsx          Kanban Command Center (4 columns, 30s poll)
-│   ├── src/app/decisions/[taskId]/page.tsx   Summary + Trail view
+│   ├── src/app/decisions/[taskId]/page.tsx   Four-tab Decision Overview
+│   ├── src/components/DecisionTimeline.tsx   Sequenced decision trail
+│   ├── src/components/ReplayViewer.tsx       Stored-record replay viewer
+│   ├── src/components/IntegrityPanel.tsx     Live integrity verification
 │   ├── src/lib/api.ts            fully typed API client
 │   └── tailwind.config.js        Tailwind adopted per docs/05
 ├── docker-compose.yml            postgres + backend + frontend (env_file, healthcheck)
@@ -125,7 +128,6 @@ register agent → start RES-2026-004821 → log evidence event
 - No authentication / RBAC (per `08_Scope_and_Non_Goals.md`)
 - Hash chain on standard DB — a DB writer could rewrite it (documented in `09_HLD.md` §6; production would add HMAC/external signing)
 - Chain-head allocation not serialized across concurrent writers (single-user demo)
-- Replay/Integrity tabs not yet built (Weeks 3–4)
 - Seed data + simulated agent not yet loaded (next task)
 - Docker not installable on the primary dev laptop — compose untested end-to-end (file follows standard patterns; will validate on a machine with Docker)
 
@@ -136,7 +138,7 @@ register agent → start RES-2026-004821 → log evidence event
 1. **Simulated research agent** — scripted lifecycle with varied outcomes (approved / partial / denied / escalated)
 2. **Seed data** — 15+ records across all Kanban columns, hero case `RES-2026-004821`, one pre-tampered record `RES-2026-009999`
 3. **Week 2 exit check** — all seeds verify green, chain verify-all passes
-4. **Week 3** — Replay tab, Integrity tab, full demo click-through
+4. **Week 3** — full demo click-through using the Decision Overview tabs
 5. **Week 4** — tamper contrast demo, polish, 3 rehearsals of the 4:20 script
 
 ---
