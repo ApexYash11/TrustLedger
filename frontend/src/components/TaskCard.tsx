@@ -43,13 +43,21 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
         : null;
 
   return (
-    <a
-      href={`/decisions/${card.task_id}`}
+    <div
       draggable
-      className="card-hover relative block cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
+      className="card-hover relative cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
     >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
+      {/* Link layer covers the whole card except the options button */}
+      <a
+        href={`/decisions/${card.task_id}`}
+        className="absolute inset-0 z-0 rounded-lg"
+        aria-label={`Open ${card.case_id}`}
+      />
+
+      {menuOpen && <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />}
+
+      <div className="pointer-events-none relative z-0">
+        <div className="mb-2 flex items-center gap-1.5 pr-8">
           <span className="rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
             {tag}
           </span>
@@ -59,40 +67,50 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          aria-label="Card options"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setMenuOpen((v) => !v);
-          }}
-          className="rounded px-1.5 text-stone-300 transition-colors hover:bg-stone-100 hover:text-stone-600"
-        >
-          ...
-        </button>
+
+        <h3 className="mb-1 text-base font-semibold leading-snug tracking-tight text-stone-900">
+          {card.case_id}
+        </h3>
+        {summary && (
+          <p className="mb-4 line-clamp-2 text-[13px] leading-relaxed text-stone-500">{summary}</p>
+        )}
+
+        <div className="flex items-center justify-between text-xs text-stone-400">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-[9px] font-bold text-stone-600">
+              {initials(card.agent_name || "AI")}
+            </span>
+            {card.duration_seconds != null && <span>{Math.round(card.duration_seconds)}s</span>}
+            {reviewLabel && <span>{reviewLabel}</span>}
+          </div>
+          <span>{fmtDate(card.created_at)}</span>
+        </div>
       </div>
 
+      <button
+        type="button"
+        aria-label="Card options"
+        onClick={(e) => {
+          e.stopPropagation();
+          setMenuOpen((v) => !v);
+        }}
+        className="absolute right-2 top-2 z-20 rounded px-1.5 text-stone-300 transition-colors hover:bg-stone-100 hover:text-stone-600"
+      >
+        ...
+      </button>
+
       {menuOpen && (
-        <div
-          className="absolute right-2 top-8 z-20 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-lg"
-          onMouseLeave={() => setMenuOpen(false)}
-        >
-          <span
-            className="block cursor-pointer px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.location.href = `/decisions/${card.task_id}`;
-            }}
+        <div className="absolute right-2 top-8 z-20 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-lg">
+          <a
+            href={`/decisions/${card.task_id}`}
+            className="block px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
           >
             Open decision
-          </span>
-          <span
-            className="block cursor-pointer px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+          </a>
+          <button
+            type="button"
+            className="block w-full px-3 py-1.5 text-left text-[13px] text-stone-700 hover:bg-stone-100"
+            onClick={() => {
               navigator.clipboard
                 ?.writeText(`${window.location.origin}/decisions/${card.task_id}`)
                 .catch(() => {});
@@ -100,27 +118,9 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
             }}
           >
             Copy link
-          </span>
+          </button>
         </div>
       )}
-
-      <h3 className="mb-1 text-base font-semibold leading-snug tracking-tight text-stone-900">
-        {card.case_id}
-      </h3>
-      {summary && (
-        <p className="mb-4 line-clamp-2 text-[13px] leading-relaxed text-stone-500">{summary}</p>
-      )}
-
-      <div className="flex items-center justify-between text-xs text-stone-400">
-        <div className="flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-[9px] font-bold text-stone-600">
-            {initials(card.agent_name || "AI")}
-          </span>
-          {card.duration_seconds != null && <span>{Math.round(card.duration_seconds)}s</span>}
-          {reviewLabel && <span>{reviewLabel}</span>}
-        </div>
-        <span>{fmtDate(card.created_at)}</span>
-      </div>
-    </a>
+    </div>
   );
 }
