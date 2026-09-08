@@ -9,3 +9,10 @@ node_modules/
 frontend/build.log
 frontend/dev.log
 frontend/build-err.txt
+# Runtime dev logs
+*.log
+uvicorn*.log
+dev_server*.log
+backend/uvicorn*.log
+frontend/dev_server*.log
+

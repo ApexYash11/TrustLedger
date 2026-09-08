@@ -20,6 +20,10 @@ def utcnow() -> datetime:
 
 class Agent(Base):
     __tablename__ = "agents"
+    # (name, domain) is the stable agent identity (issue #12): the composite
+    # unique constraint backs the idempotent registration race, so two concurrent
+    # POSTs can never commit two different agent_ids for the same agent.
+    __table_args__ = (UniqueConstraint("name", "domain", name="uq_agent_name_domain"),)
 
     agent_id = Column(String(36), primary_key=True, default=new_uuid)
     name = Column(String(255), nullable=False)

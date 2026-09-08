@@ -1,16 +1,33 @@
+import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .db import Base, engine
+from .db import Base, SessionLocal, engine
 from .routes import agents, decisions
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+
+    dispatcher_task = None
+    # Run the agent dispatcher in-process unless explicitly disabled (tests).
+    if os.environ.get("TRUSTLEDGER_DISPATCHER", "1") != "0":
+        from agents.runtime import dispatcher_loop
+
+        dispatcher_task = asyncio.create_task(dispatcher_loop(SessionLocal, poll_seconds=float(os.environ.get("TRUSTLEDGER_POLL", "2.0"))))
+
     yield
+
+    if dispatcher_task is not None:
+        dispatcher_task.cancel()
+        try:
+            await dispatcher_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
