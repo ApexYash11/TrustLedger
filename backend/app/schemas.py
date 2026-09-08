@@ -96,6 +96,29 @@ class DecisionStartResponse(BaseModel):
     created_at: str
 
 
+class AgentOut(BaseModel):
+    agent_id: str
+    name: str
+    version: str
+    domain: str
+    description: Optional[str] = None
+
+
+class AgentListResponse(BaseModel):
+    agents: list[AgentOut]
+    total: int
+
+
+class ClaimTaskResponse(BaseModel):
+    task_id: str
+    case_id: str
+    case_type: str
+    agent_id: str
+    status: str
+    inputs: dict[str, Any]
+    created_at: str
+
+
 class EventAppended(BaseModel):
     event_id: str
     sequence: int

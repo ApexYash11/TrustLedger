@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task, new_uuid, utcnow
+from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task, utcnow
 from ..schemas import (
+    AgentListResponse,
     ChainVerifyResponse,
+    ClaimTaskResponse,
     CompleteResponse,
     DecisionComplete,
     DecisionList,
@@ -22,9 +25,11 @@ from ..schemas import (
     TaskSummary,
     VerifyResponse,
 )
+from ..services import decision_ops
+from ..services.event_hub import event_hub, format_sse
 from ..services.hash_chain import verify_record_hash
 from ..services.replay import build_replay
-from ..services.sealer import extract_evidence_and_policies, latest_audit_record, seal_record
+from ..services.sealer import extract_evidence_and_policies
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
@@ -52,162 +57,151 @@ def update_task_status(task_id: str, payload: StatusUpdate, db: Session = Depend
             status_code=409,
             detail={"error": "Task is sealed to the audit chain and can no longer be modified", "code": "TASK_SEALED"},
         )
+
+    # Integrity invariant (issue #15): a task must not reach a terminal state via a
+    # manual status patch. Completed / review_required can only be reached by
+    # POST /complete (or POST /agents/runtime), each of which produces a sealed
+    # Decision + AuditRecord. Manual moves are for non-terminal lanes only.
+    if payload.status in decision_ops.TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": (
+                    f"Task cannot be moved directly to '{payload.status}' via status PATCH. "
+                    "Terminal states require a sealed decision record (POST /complete)."
+                ),
+                "code": "TASK_NOT_SEALED",
+            },
+        )
+
     task.status = payload.status
     db.commit()
+    decision_ops.emit_task_status(task.task_id, task.case_id, task.status)
     return StatusUpdated(task_id=task.task_id, status=task.status)
 
 
 @router.post("/start", response_model=DecisionStartResponse)
 def start_decision(payload: DecisionStart, db: Session = Depends(get_db)):
-    agent = db.query(Agent).filter(Agent.agent_id == payload.agent_id).first()
-    if not agent:
+    try:
+        task = decision_ops.start_decision(
+            db,
+            agent_id=payload.agent_id,
+            case_id=payload.case_id,
+            case_type=payload.case_type,
+            inputs=payload.inputs,
+        )
+    except LookupError:
         raise HTTPException(status_code=404, detail={"error": "Agent not registered", "code": "AGENT_NOT_FOUND"})
-
-    now = utcnow()
-    task = Task(
-        case_id=payload.case_id,
-        case_type=payload.case_type,
-        agent_id=payload.agent_id,
-        status="running",
-        inputs=payload.inputs,
-        created_at=now,
-        started_at=now,
-    )
-    db.add(task)
-    db.flush()
-
-    event = DecisionEvent(
-        task_id=task.task_id,
-        sequence=1,
-        event_type="case_received",
-        summary=f"Research task {task.case_id} received for automated processing",
-        actor="system",
-        details=None,
-        timestamp=now,
-    )
-    db.add(event)
-    db.commit()
     return {"task_id": task.task_id, "status": task.status, "created_at": _iso(task.created_at)}
+@router.post("/queue", response_model=DecisionStartResponse)
+def queue_decision(payload: DecisionStart, db: Session = Depends(get_db)):
+    """Create a card directly in the ``queued`` lane for the dispatcher to claim."""
+    try:
+        task = decision_ops.queue_decision(
+            db,
+            agent_id=payload.agent_id,
+            case_id=payload.case_id,
+            case_type=payload.case_type,
+            inputs=payload.inputs,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail={"error": "Agent not registered", "code": "AGENT_NOT_FOUND"})
+    return {"task_id": task.task_id, "status": task.status, "created_at": _iso(task.created_at)}
+
+
+@router.post("/claim", response_model=ClaimTaskResponse)
+def claim_next_task(db: Session = Depends(get_db)):
+    """Claim the oldest ``queued`` task and move it to ``running`` (dispatcher flow).
+
+    Two workers claiming at once resolve on the row lock: the loser's UPDATE affects
+    zero rows, so only one worker actually runs the task.
+    """
+    claimed = (
+        db.query(Task)
+        .filter(Task.status == "queued")
+        .order_by(Task.created_at.asc())
+        .with_for_update(skip_locked=True)
+        .first()
+    )
+    if not claimed:
+        raise HTTPException(status_code=404, detail={"error": "No queued tasks", "code": "NO_QUEUED_TASKS"})
+
+    claimed.status = "running"
+    claimed.started_at = utcnow()
+    db.add(
+        DecisionEvent(
+            task_id=claimed.task_id,
+            sequence=decision_ops._next_sequence(db, claimed.task_id),
+            event_type="case_received",
+            summary=f"Research task {claimed.case_id} picked up by dispatcher",
+            actor="system",
+        )
+    )
+    db.commit()
+    decision_ops.emit_task_status(claimed.task_id, claimed.case_id, "running")
+
+    return {
+        "task_id": claimed.task_id,
+        "case_id": claimed.case_id,
+        "case_type": claimed.case_type,
+        "agent_id": claimed.agent_id,
+        "status": claimed.status,
+        "inputs": claimed.inputs,
+        "created_at": _iso(claimed.created_at),
+    }
+
+
+@router.get("/stream")
+async def decision_stream():
+    """Server-Sent Events: live card movement + event log for the Kanban.
+
+    Emits newline-delimited ``data: <json>`` frames on every status/event change.
+    """
+    async def gen():
+        async for ev in event_hub.subscribe():
+            yield format_sse(ev)
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/{task_id}/events", response_model=EventAppended)
 def append_event(task_id: str, payload: EventAppend, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, task_id)
-    if _is_sealed(db, task_id):
+    _get_task_or_404(db, task_id)
+    try:
+        event = decision_ops.append_event(
+            db,
+            task_id=task_id,
+            event_type=payload.event_type,
+            summary=payload.summary,
+            actor=payload.actor,
+            details=payload.details,
+        )
+    except PermissionError:
         raise HTTPException(status_code=409, detail={"error": "Decision already sealed", "code": "SEALED"})
-
-    last_seq = (
-        db.query(DecisionEvent.sequence)
-        .filter(DecisionEvent.task_id == task_id)
-        .order_by(DecisionEvent.sequence.desc())
-        .first()
-    )
-    sequence = (last_seq[0] + 1) if last_seq else 1
-
-    event = DecisionEvent(
-        event_id=new_uuid(),
-        task_id=task_id,
-        sequence=sequence,
-        event_type=payload.event_type,
-        timestamp=utcnow(),
-        summary=payload.summary,
-        details=payload.details,
-        actor=payload.actor,
-    )
-    db.add(event)
-    db.commit()
     return {"event_id": event.event_id, "sequence": event.sequence, "timestamp": _iso(event.timestamp)}
 
 
 @router.post("/{task_id}/complete", response_model=CompleteResponse)
 def complete_decision(task_id: str, payload: DecisionComplete, db: Session = Depends(get_db)):
-    task = _get_task_or_404(db, task_id)
-    if _is_sealed(db, task_id):
+    _get_task_or_404(db, task_id)
+    try:
+        return decision_ops.complete_decision(
+            db,
+            task_id=task_id,
+            outcome=payload.outcome,
+            outcome_summary=payload.outcome_summary,
+            structured_rationale=payload.structured_rationale,
+            alternatives_considered=payload.alternatives_considered,
+            confidence_score=payload.confidence_score,
+            requires_human_review=payload.requires_human_review,
+            risk_level=payload.risk_level,
+        )
+    except PermissionError:
         raise HTTPException(status_code=409, detail={"error": "Decision already sealed", "code": "SEALED"})
-
-    now = utcnow()
-    decision = Decision(
-        decision_id=new_uuid(),
-        task_id=task_id,
-        outcome=payload.outcome,
-        outcome_summary=payload.outcome_summary,
-        structured_rationale=payload.structured_rationale,
-        alternatives_considered=payload.alternatives_considered,
-        confidence_score=payload.confidence_score,
-        decided_at=now,
-    )
-    db.add(decision)
-
-    if payload.risk_level:
-        task.risk_level = payload.risk_level
-
-    if payload.requires_human_review:
-        task.status = "review_required"
-        task.human_review_status = "triggered"
-        db.add(
-            DecisionEvent(
-                task_id=task_id,
-                sequence=_next_sequence(db, task_id),
-                event_type="human_review_triggered",
-                summary="Flagged for human review",
-                actor="system",
-                details={"trigger_reason": "requires_human_review set by agent"},
-            )
-        )
-    else:
-        task.status = "completed"
-        task.human_review_status = "not_required"
-
-    db.flush()
-
-    db.add(
-        DecisionEvent(
-            task_id=task_id,
-            sequence=_next_sequence(db, task_id),
-            event_type="decision_generated",
-            summary=payload.outcome_summary,
-            actor="agent",
-        )
-    )
-    db.add(
-        DecisionEvent(
-            task_id=task_id,
-            sequence=_next_sequence(db, task_id),
-            event_type="record_sealed",
-            summary="Decision record sealed and hash-chained",
-            actor="system",
-        )
-    )
-    db.flush()
-
-    task.completed_at = now
-
-    # Seal last so the snapshot captures every event, including record_sealed.
-    audit = seal_record(db, task, decision)
-
-    db.commit()
-    return {
-        "decision_id": decision.decision_id,
-        "task_id": task_id,
-        "status": task.status,
-        "audit_record": {
-            "audit_id": audit.audit_id,
-            "record_hash": audit.record_hash,
-            "previous_hash": audit.previous_hash,
-            "chain_sequence": audit.chain_sequence,
-            "sealed_at": _iso(audit.sealed_at),
-        },
-    }
 
 
 def _next_sequence(db: Session, task_id: str) -> int:
-    last = (
-        db.query(DecisionEvent.sequence)
-        .filter(DecisionEvent.task_id == task_id)
-        .order_by(DecisionEvent.sequence.desc())
-        .first()
-    )
-    return (last[0] + 1) if last else 1
+    return decision_ops._next_sequence(db, task_id)
 
 
 @router.get("", response_model=DecisionList)

@@ -1,139 +1,100 @@
-"""Simulated Deloitte client research agent - drives the TrustLedger logging API.
+"""Research dive agent (issue #12) — performs a Deloitte client-research task live.
 
-Reads scenarios from seed/demo_data.json and executes them against a running
-TrustLedger API with realistic delays, producing varied outcomes.
+Unlike the old static replay script, this agent is dispatched by the runtime: it
+claims a queued task, streams its work as ledger ``decision_event`` steps (so the
+task's card animates on the Kanban), and seals a decision at the end.
 
-Usage:
-    python -m agents.research_agent                # run all non-queued scenarios
-    python -m agents.research_agent --case RES-2026-004821
-    AGENT_DELAY=0.2 python -m agents.research_agent
+Run standalone against a live API with::
 
-Environment:
-    TRUSTLEDGER_API   base URL (default http://localhost:8000/api/v1)
-    AGENT_DELAY       seconds between steps (default 0.4)
+    python -m agents.research_agent --case RES-2026-004821   # seed a fresh task live
 """
-import argparse
-import json
-import os
-import sys
-import time
-from pathlib import Path
-
-import httpx
-
-API = os.environ.get("TRUSTLEDGER_API", "http://localhost:8000/api/v1")
-DELAY = float(os.environ.get("AGENT_DELAY", "0.4"))
-SEED_FILE = Path(__file__).parent.parent / "seed" / "demo_data.json"
+from .base import AgentContext, AgentResult, DiveAgent, Step
 
 
-def ensure_agent(client: httpx.Client) -> str:
-    existing = client.get("/agents")
-    # No list endpoint for agents; register is idempotent-enough for the demo
-    # because each registration creates a new agent row - reuse by name lookup via DB
-    # is unnecessary here since the dashboard groups by agent name.
-    resp = client.post(
-        "/agents",
-        json={
-            "name": "ResearchAgent",
-            "version": "1.2.0",
-            "domain": "deloitte_client_research",
-            "description": "Simulated Deloitte client research agent",
-        },
-    )
-    resp.raise_for_status()
-    return resp.json()["agent_id"]
+class ResearchAgent(DiveAgent):
+    name = "ResearchAgent"
+    version = "1.3.0"
+    domain = "deloitte_client_research"
+    description = "Deloitte client research agent — market entry, vendor risk, regulatory scans."
 
+    def build_steps(self, ctx: AgentContext, inputs: dict) -> list[Step]:
+        client = inputs.get("client_name", "the client")
+        question = inputs.get("research_question", "validate the research recommendation")
+        return [
+            Step("data_retrieved", f"Client engagement brief and market data for {client} retrieved"),
+            Step(
+                "policy_retrieved",
+                "Methodology DEL-RM-2026 loaded",
+                details={"policy_reference": {
+                    "policy_code": "DEL-RM-2026",
+                    "section": "5.3",
+                    "title": "Market Entry Evidence Thresholds",
+                    "text_excerpt": "Requires three independent demand-side sources and a validated competitor cost baseline.",
+                    "application": "Applied while testing the recommendation.",
+                }},
+            ),
+            Step(
+                "clause_identified",
+                "Applicable standards identified",
+                details={"policy_reference": {
+                    "policy_code": "GEO-CONF-2026",
+                    "section": "B.2",
+                    "title": "Geographic Market Definition",
+                    "text_excerpt": "Define served market to sub-region level for mandate screening.",
+                    "application": f"Scoped to {client}'s served geography.",
+                }},
+            ),
+            Step(
+                "evidence_evaluated",
+                f"Third-party outlook evaluated against: {question}",
+                details={"evidence": {
+                    "evidence_type": "third_party_report",
+                    "title": "Sector Outlook 2026",
+                    "source": "Licensed research provider",
+                    "content_summary": "Moderate growth with downward revision risk on input costs.",
+                    "relevance": "Primary demand-side source",
+                }},
+            ),
+            Step(
+                "evidence_evaluated",
+                "Client financial benchmark reviewed",
+                details={"evidence": {
+                    "evidence_type": "financial_report",
+                    "title": "Client FY26 Financials",
+                    "source": "Client-provided",
+                    "content_summary": "Revenue and margin baseline consistent with mandate.",
+                    "relevance": "Validates competitor cost baseline",
+                }},
+            ),
+            Step("decision_generated", "Recommendation generated and rationale structured"),
+        ]
 
-def log_step(case_id: str, icon: str, text: str):
-    print(f"  {icon} [{case_id}] {text}")
-
-
-def run_scenario(client: httpx.Client, agent_id: str, sc: dict) -> dict:
-    case_id = sc["case_id"]
-    target = sc.get("status_target", "completed")
-
-    resp = client.post(
-        "/decisions/start",
-        json={
-            "agent_id": agent_id,
-            "case_id": case_id,
-            "case_type": sc["case_type"],
-            "inputs": sc["inputs"],
-        },
-    )
-    resp.raise_for_status()
-    task_id = resp.json()["task_id"]
-    log_step(case_id, ">", "started")
-
-    time.sleep(DELAY)
-
-    for ev in sc["events"]:
-        details = dict(ev.get("details") or {})
-        if "evidence" in ev:
-            details["evidence"] = ev["evidence"]
-        if "policy_reference" in ev:
-            details["policy_reference"] = ev["policy_reference"]
-        payload = {
-            "event_type": ev["event_type"],
-            "summary": ev["summary"],
-            "actor": ev.get("actor", "agent"),
-        }
-        if details:
-            payload["details"] = details
-        r = client.post(f"/decisions/{task_id}/events", json=payload)
-        r.raise_for_status()
-        log_step(case_id, "-", f"{ev['event_type']}: {ev['summary']}")
-        time.sleep(DELAY)
-
-    if target == "running":
-        log_step(case_id, "||", "left running (no completion)")
-        return {"case_id": case_id, "task_id": task_id, "status": "running"}
-
-    d = sc["decision"]
-    resp = client.post(
-        f"/decisions/{task_id}/complete",
-        json={
-            "outcome": d["outcome"],
-            "outcome_summary": d["outcome_summary"],
-            "structured_rationale": d["structured_rationale"],
-            "alternatives_considered": d.get("alternatives_considered"),
-            "confidence_score": d.get("confidence_score"),
-            "requires_human_review": sc.get("requires_human_review", False),
-            "risk_level": sc.get("risk_level"),
-        },
-    )
-    resp.raise_for_status()
-    body = resp.json()
-    log_step(case_id, "[done]", f"{body['status']} - sealed at chain #{body['audit_record']['chain_sequence']}")
-    return {"case_id": case_id, "task_id": task_id, "status": body["status"]}
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", help="run only the scenario with this case_id")
-    args = parser.parse_args()
-
-    data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
-    scenarios = data["scenarios"]
-    if args.case:
-        scenarios = [s for s in scenarios if s["case_id"] == args.case]
-        if not scenarios:
-            print(f"No scenario found for {args.case}")
-            sys.exit(1)
-    # queued scenarios are not executed by the agent; running ones stop mid-flight
-    scenarios = [s for s in scenarios if s.get("status_target") != "queued"]
-
-    print(f"TrustLedger simulated research agent -> {API}")
-    print(f"Running {len(scenarios)} scenario(s) with {DELAY}s step delay\n")
-
-    with httpx.Client(base_url=API, timeout=30) as client:
-        agent_id = ensure_agent(client)
-        results = [run_scenario(client, agent_id, sc) for sc in scenarios]
-
-    print("\n=== Agent Run Summary ===")
-    for r in results:
-        print(f"  {r['case_id']}: {r['status']}")
-
-
-if __name__ == "__main__":
-    main()
+    def decide(self, ctx: AgentContext, inputs: dict) -> AgentResult:
+        if inputs.get("escalate") or inputs.get("high_value"):
+            return AgentResult(
+                outcome="escalated",
+                outcome_summary="High-value engagement flagged for partner review before issuance.",
+                structured_rationale={
+                    "primary_reason": "Conflicting findings on data residency require human sign-off.",
+                    "supporting_factors": ["High engagement value", "Regulatory exposure"],
+                    "policy_basis": ["DEL-RM-2026 5.3"],
+                    "evidence_basis": ["Sector Outlook 2026"],
+                    "exclusions_applied": [],
+                },
+                confidence_score=0.78,
+                requires_human_review=True,
+                risk_level="high",
+            )
+        return AgentResult(
+            outcome="recommended_with_caveats",
+            outcome_summary="Conditional recommendation: phased pilot entry; monitor input-cost revisions.",
+            structured_rationale={
+                "primary_reason": "Demand signals support entry with caveats on input-cost volatility.",
+                "supporting_factors": ["Market growth", "Client readiness"],
+                "policy_basis": ["DEL-RM-2026 5.3"],
+                "evidence_basis": ["Sector Outlook 2026", "FY26 Financials"],
+                "exclusions_applied": None,
+            },
+            confidence_score=0.85,
+            risk_level="medium",
+        )
