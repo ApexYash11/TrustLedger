@@ -4,9 +4,9 @@ Unlike the old static replay script, this agent is dispatched by the runtime: it
 claims a queued task, streams its work as ledger ``decision_event`` steps (so the
 task's card animates on the Kanban), and seals a decision at the end.
 
-Run standalone against a live API with::
-
-    python -m agents.research_agent --case RES-2026-004821   # seed a fresh task live
+This module is an importable agent, not a standalone script: it is instantiated
+and dispatched by ``agents.runtime`` (via ``agents.registry``) and is never run
+directly with ``python -m``.
 """
 from .base import AgentContext, AgentResult, DiveAgent, Step
 

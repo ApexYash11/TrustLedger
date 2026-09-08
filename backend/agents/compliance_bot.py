@@ -54,6 +54,7 @@ class ComplianceBot(DiveAgent):
                     "exclusions_applied": [],
                 },
                 confidence_score=0.9,
+                requires_human_review=True,
                 risk_level="high",
             )
         return AgentResult(

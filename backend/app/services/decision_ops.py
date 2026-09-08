@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task, new_uuid, utcnow
 from ..services.sealer import seal_record
+from agents.registry import has_agent_implementation
 from .event_hub import emit_event
 
 TERMINAL_STATUSES = {"completed", "review_required"}
@@ -83,10 +84,19 @@ def start_decision(db: Session, *, agent_id: str, case_id: str, case_type: str, 
 def queue_decision(
     db: Session, *, agent_id: str, case_id: str, case_type: str, inputs: dict
 ) -> Task:
-    """Create a task in ``queued`` state, ready for an agent to claim at runtime."""
+    """Create a task in ``queued`` state, ready for an agent to claim at runtime.
+
+    Raises:
+        LookupError: ``AGENT_NOT_FOUND`` when ``agent_id`` is unknown, or
+            ``NO_AGENT_IMPLEMENTATION`` when the agent's domain has no registered
+            DiveAgent — such a task could never be dispatched, so it is rejected
+            at queue time instead of stranding in the ``queued`` lane.
+    """
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise LookupError("AGENT_NOT_FOUND")
+    if not has_agent_implementation(agent.domain):
+        raise LookupError("NO_AGENT_IMPLEMENTATION")
     task = Task(
         case_id=case_id,
         case_type=case_type,

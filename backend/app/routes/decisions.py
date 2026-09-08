@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from agents import runtime
 from ..db import get_db
-from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task, utcnow
+from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task
 from ..schemas import (
     AgentListResponse,
     ChainVerifyResponse,
@@ -104,50 +105,44 @@ def queue_decision(payload: DecisionStart, db: Session = Depends(get_db)):
             case_type=payload.case_type,
             inputs=payload.inputs,
         )
-    except LookupError:
+    except LookupError as exc:
+        if str(exc) == "NO_AGENT_IMPLEMENTATION":
+            # The agent exists but its domain has no registered DiveAgent: the
+            # dispatcher would never be able to run it (CodeRabbit, PR #21).
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Agent domain has no registered agent implementation",
+                    "code": "NO_AGENT_IMPLEMENTATION",
+                },
+            )
         raise HTTPException(status_code=404, detail={"error": "Agent not registered", "code": "AGENT_NOT_FOUND"})
     return {"task_id": task.task_id, "status": task.status, "created_at": _iso(task.created_at)}
 
 
 @router.post("/claim", response_model=ClaimTaskResponse)
-def claim_next_task(db: Session = Depends(get_db)):
+def claim_next_task_route(db: Session = Depends(get_db)):
     """Claim the oldest ``queued`` task and move it to ``running`` (dispatcher flow).
 
-    Two workers claiming at once resolve on the row lock: the loser's UPDATE affects
-    zero rows, so only one worker actually runs the task.
+    Delegates to :func:`agents.runtime.claim_next_task` so the API path and the
+    dispatcher share one atomic claim implementation: a conditional UPDATE from
+    ``queued`` to ``running`` that only proceeds when exactly one row is affected.
+    (``with_for_update`` is a no-op on SQLite, so row locks alone cannot arbitrate
+    concurrent claimers.)
     """
-    claimed = (
-        db.query(Task)
-        .filter(Task.status == "queued")
-        .order_by(Task.created_at.asc())
-        .with_for_update(skip_locked=True)
-        .first()
-    )
-    if not claimed:
+    claimed = runtime.claim_next_task(db)
+    if claimed is None:
         raise HTTPException(status_code=404, detail={"error": "No queued tasks", "code": "NO_QUEUED_TASKS"})
-
-    claimed.status = "running"
-    claimed.started_at = utcnow()
-    db.add(
-        DecisionEvent(
-            task_id=claimed.task_id,
-            sequence=decision_ops._next_sequence(db, claimed.task_id),
-            event_type="case_received",
-            summary=f"Research task {claimed.case_id} picked up by dispatcher",
-            actor="system",
-        )
-    )
-    db.commit()
-    decision_ops.emit_task_status(claimed.task_id, claimed.case_id, "running")
+    task, _agent = claimed
 
     return {
-        "task_id": claimed.task_id,
-        "case_id": claimed.case_id,
-        "case_type": claimed.case_type,
-        "agent_id": claimed.agent_id,
-        "status": claimed.status,
-        "inputs": claimed.inputs,
-        "created_at": _iso(claimed.created_at),
+        "task_id": task.task_id,
+        "case_id": task.case_id,
+        "case_type": task.case_type,
+        "agent_id": task.agent_id,
+        "status": task.status,
+        "inputs": task.inputs,
+        "created_at": _iso(task.created_at),
     }
 
 
