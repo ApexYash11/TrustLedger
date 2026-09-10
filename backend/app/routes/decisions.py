@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from agents import runtime
@@ -48,6 +49,39 @@ def _get_task_or_404(db: Session, task_id: str) -> Task:
 
 def _is_sealed(db: Session, task_id: str) -> bool:
     return db.query(AuditRecord).filter(AuditRecord.task_id == task_id).first() is not None
+
+
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_decision(task_id: str, db: Session = Depends(get_db)):
+    """Delete an unsealed task and every record owned by it (issue #6).
+
+    Audit records are the source of truth for whether a task is on the hash
+    chain. Once one exists, nothing associated with that task can be removed,
+    so sealed tasks are rejected with 409 TASK_SEALED.
+    """
+    task = _get_task_or_404(db, task_id)
+    if _is_sealed(db, task_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "This task has been sealed on the hash chain and cannot be deleted",
+                "code": "TASK_SEALED",
+            },
+        )
+
+    try:
+        # These models do not define ORM or database-level delete cascades, so
+        # remove children explicitly before their parent in one transaction.
+        db.query(Decision).filter(Decision.task_id == task_id).delete(synchronize_session=False)
+        db.query(DecisionEvent).filter(DecisionEvent.task_id == task_id).delete(synchronize_session=False)
+        db.query(AuditRecord).filter(AuditRecord.task_id == task_id).delete(synchronize_session=False)
+        db.delete(task)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/{task_id}/status", response_model=StatusUpdated)

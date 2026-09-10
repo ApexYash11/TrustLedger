@@ -25,6 +25,8 @@ export default function DashboardPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [modalCol, setModalCol] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskSummary | null>(null);
+  const [liveOn, setLiveOn] = useState(false);
 
   /** Track in-flight drags so the auto-refresh can skip while dragging. */
   const isDraggingRef = useRef(false);
@@ -47,21 +49,46 @@ export default function DashboardPage() {
   useEffect(() => {
     refresh();
     const timer = setInterval(refresh, 30000);
-    return () => clearInterval(timer);
+    // Live SSE feed (issue #14): in-flight queued -> running -> completed card
+    // movement arrives within ~1-3s while the 30s poll stays as a resync fallback.
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/api\/v1\/?$/, "");
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`${base}/api/v1/decisions/stream`);
+      es.onopen = () => setLiveOn(true);
+      es.onerror = () => setLiveOn(false);
+      es.onmessage = (msg) => {
+        try {
+          const ev = JSON.parse(msg.data) as { event?: string; task_id?: string; status?: string };
+          if (ev.event === "status_changed" && ev.task_id && ev.status) {
+            const { task_id, status } = ev;
+            setData((prev) => ({
+              ...prev,
+              decisions: prev.decisions.map((d) => (d.task_id === task_id ? { ...d, status } : d)),
+            }));
+          } else {
+            // Any other hub event (event appended / decision sealed) triggers a
+            // lightweight resync; the drag guard inside refresh() still applies.
+            refresh();
+          }
+        } catch {
+          refresh();
+        }
+      };
+    } catch {
+      // EventSource unavailable (very old browser): polling fallback covers it.
+    }
+    return () => {
+      clearInterval(timer);
+      es?.close();
+    };
   }, [refresh]);
 
-  const onDrop = (col: string) => {
-    if (!dragId) return;
-    const taskId = dragId;
+  const applyStatus = (taskId: string, col: string) => {
     // Capture previous status BEFORE the optimistic update
     const previous = data.decisions.find((d) => d.task_id === taskId)?.status;
     // If the card is dropped on its current column, no-op
-    if (previous === col) {
-      setDragId(null);
-      setDragOverCol(null);
-      isDraggingRef.current = false;
-      return;
-    }
+    if (previous === col) return;
     // Optimistic local move
     setData((prev) => ({
       ...prev,
@@ -69,26 +96,74 @@ export default function DashboardPage() {
         d.task_id === taskId ? { ...d, status: col } : d
       ),
     }));
+    // Persist to backend so the next refresh keeps the card in its new column
+    api.updateDecisionStatus(taskId, col).catch((err: unknown) => {
+      // Always revert on failure - don't gate on previous truthiness
+      const revertStatus = previous ?? col;
+      setData((prev) => ({
+        ...prev,
+        decisions: prev.decisions.map((d) =>
+          d.task_id === taskId ? { ...d, status: revertStatus } : d
+        ),
+      }));
+      // Show user-visible feedback for sealed-record / terminal-state rejection
+      if (err instanceof ApiError && err.status === 409) {
+        if (err.code === "TASK_NOT_SEALED") {
+          alert(
+            `Cannot move "${taskId}" to "${col}": terminal states need a sealed decision record. Complete the task from its detail page instead.`
+          );
+        } else {
+          alert(`Cannot move "${taskId}": this record is sealed to the audit chain.`);
+        }
+      }
+    });
+  };
+
+  const confirmDelete = () => {
+    const target = deleteTarget;
+    if (!target) return;
+    const taskId = target.task_id;
+    // Local-only demo cards vanish immediately; nothing to delete server-side.
+    if (taskId.startsWith("local-") || taskId.startsWith("demo-")) {
+      setData((prev) => ({
+        total: prev.total - 1,
+        decisions: prev.decisions.filter((d) => d.task_id !== taskId),
+      }));
+      setDeleteTarget(null);
+      return;
+    }
+    api
+      .deleteDecision(taskId)
+      .then(() => {
+        setData((prev) => ({
+          total: prev.total - 1,
+          decisions: prev.decisions.filter((d) => d.task_id !== taskId),
+        }));
+        setDeleteTarget(null);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 409) {
+          alert(`Cannot delete "${target.case_id}": this record is sealed to the audit chain.`);
+        } else if (err instanceof ApiError && err.status === 404) {
+          // Already gone server-side: drop it locally to stay in sync.
+          setData((prev) => ({
+            total: prev.total - 1,
+            decisions: prev.decisions.filter((d) => d.task_id !== taskId),
+          }));
+          setDeleteTarget(null);
+        } else {
+          alert(`Delete failed for "${target.case_id}". Please try again.`);
+        }
+      });
+  };
+
+  const onDrop = (col: string) => {
+    if (!dragId) return;
+    const taskId = dragId;
     setDragId(null);
     setDragOverCol(null);
     isDraggingRef.current = false;
-    // Persist to backend so the next refresh keeps the card in its new column
-    api
-      .updateDecisionStatus(taskId, col)
-      .catch((err: unknown) => {
-        // Always revert on failure â€” don't gate on previous truthiness
-        const revertStatus = previous ?? col;
-        setData((prev) => ({
-          ...prev,
-          decisions: prev.decisions.map((d) =>
-            d.task_id === taskId ? { ...d, status: revertStatus } : d
-          ),
-        }));
-        // Show user-visible feedback for sealed-record rejection
-        if (err instanceof ApiError && err.status === 409) {
-          alert(`Cannot move "${taskId}": this record is sealed to the audit chain.`);
-        }
-      });
+    applyStatus(taskId, col);
   };
 
   const addTask = (col: string, title: string, caseType: string) => {
@@ -116,9 +191,17 @@ export default function DashboardPage() {
       <Sidebar />
       <main className="flex-1 bg-white p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold tracking-tight text-stone-900">
-          Research Command Center
-        </h1>
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight text-stone-900">
+            Research Command Center
+          </h1>
+          <p className="mt-0.5 text-[12px] text-stone-500">
+            <span
+              className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${liveOn ? "bg-green-500" : "bg-stone-300"}`}
+            />
+            {liveOn ? "Live updates on" : "Connecting live feed (30s polling fallback)"}
+          </p>
+        </div>
         <button
           onClick={() => setModalCol("queued")}
           className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700"
@@ -177,7 +260,7 @@ export default function DashboardPage() {
                       onDragEnd={() => { setDragId(null); isDraggingRef.current = false; }}
                       className={dragId === card.task_id ? "dragging" : ""}
                     >
-                      <TaskCard card={card} />
+                      <TaskCard card={card} onStatusChange={applyStatus} onDelete={setDeleteTarget} />
                     </div>
                   ))}
 
@@ -195,6 +278,37 @@ export default function DashboardPage() {
       </main>
       {modalCol && (
         <NewTaskModal col={modalCol} onClose={() => setModalCol(null)} onCreate={addTask} />
+      )}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-base font-semibold tracking-tight text-stone-900">Delete task?</h2>
+            <p className="mb-5 text-[13px] leading-relaxed text-stone-500">
+              Delete &quot;{deleteTarget.case_id}&quot;? This removes the task and its events.
+              Sealed records on the hash chain cannot be deleted.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-md border border-stone-200 px-3 py-1.5 text-[13px] font-medium text-stone-600 transition-colors hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-red-500"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

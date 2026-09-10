@@ -29,12 +29,34 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export default function TaskCard({ card }: { card: TaskSummary }) {
+/** Status actions available from the kebab menu (issue #9), keyed by target status. */
+const STATUS_ACTIONS: { label: string; status: string; icon: string }[] = [
+  { label: "Mark Disputed", status: "disputed", icon: "!" },
+  { label: "Send to Review", status: "review_required", icon: "<" },
+  { label: "Mark Completed", status: "completed", icon: "v" },
+  { label: "Re-queue", status: "queued", icon: "o" },
+  { label: "Set Running", status: "running", icon: ">" },
+];
+
+export default function TaskCard({
+  card,
+  onStatusChange,
+  onDelete,
+}: {
+  card: TaskSummary;
+  /** Called when the user picks a new status from the kebab menu. */
+  onStatusChange?: (taskId: string, newStatus: string) => void;
+  /** Called when the user picks Delete - parent owns the confirm modal (issue #6). */
+  onDelete?: (card: TaskSummary) => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const tag = clean(card.case_type || "Case");
   const riskKey = card.risk_level ?? "";
   const tagCls = RISK_TAGS[riskKey];
   const summary = card.outcome_summary ?? card.outcome?.replace(/_/g, " ") ?? null;
+  const isDisputed = card.status === "disputed";
+  // Filter out the card's current status so users only see transitions they can make.
+  const availableActions = STATUS_ACTIONS.filter((a) => a.status !== card.status);
   const reviewLabel =
     card.human_review_status === "pending"
       ? "In review"
@@ -64,6 +86,11 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
           {tagCls && (
             <span className={`rounded border px-1.5 py-0.5 text-[11px] font-medium ${tagCls}`}>
               {riskKey}
+            </span>
+          )}
+          {isDisputed && (
+            <span className="rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+              Disputed
             </span>
           )}
         </div>
@@ -100,7 +127,7 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
       </button>
 
       {menuOpen && (
-        <div className="absolute right-2 top-8 z-20 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-2 top-8 z-20 w-44 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-lg">
           <a
             href={`/decisions/${card.task_id}`}
             className="block px-3 py-1.5 text-[13px] text-stone-700 hover:bg-stone-100"
@@ -118,6 +145,33 @@ export default function TaskCard({ card }: { card: TaskSummary }) {
             }}
           >
             Copy link
+          </button>
+          <div className="my-1 border-t border-stone-100" />
+          {availableActions.map((action) => (
+            <button
+              key={action.status}
+              type="button"
+              className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-stone-100 ${
+                action.status === "disputed" ? "text-amber-700" : "text-stone-700"
+              }`}
+              onClick={() => {
+                onStatusChange?.(card.task_id, action.status);
+                setMenuOpen(false);
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+          <div className="my-1 border-t border-stone-100" />
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onDelete?.(card);
+            }}
+            className="block w-full px-3 py-1.5 text-left text-[13px] font-medium text-red-600 hover:bg-red-50"
+          >
+            Delete
           </button>
         </div>
       )}
