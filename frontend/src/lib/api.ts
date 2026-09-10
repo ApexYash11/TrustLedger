@@ -140,7 +140,27 @@ async function del(path: string): Promise<void> {
   if (!res.ok) throw await apiError(res, path);
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw await apiError(res, path);
+  return res.json();
+}
+
+export interface AgentOut {
+  agent_id: string;
+  name: string;
+  version: string;
+  domain: string;
+  description: string | null;
+}
+
 export const api = {
+  listAgents: () => get<{ agents: AgentOut[]; total: number }>("/agents"),
   listDecisions: (params?: { status?: string; risk_level?: string; case_id?: string }) =>
     get<DecisionListResponse>("/decisions", params),
   getDecision: (taskId: string) => get<FullDecisionRecord>(`/decisions/${taskId}`),
@@ -149,4 +169,6 @@ export const api = {
   updateDecisionStatus: (taskId: string, status: string) =>
     patch<{ task_id: string; status: string }>(`/decisions/${taskId}/status`, { status }),
   deleteDecision: (taskId: string) => del(`/decisions/${taskId}`),
+  queueDecision: (body: { agent_id: string; case_id: string; case_type: string; inputs: Record<string, unknown> }) =>
+    post<{ task_id: string; status: string; created_at: string }>("/decisions/queue", body),
 };

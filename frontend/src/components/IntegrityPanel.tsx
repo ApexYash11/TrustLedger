@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, VerifyResponse } from "@/lib/api";
-import { getDemoVerify } from "@/lib/demoData";
 import { formatTimestamp, humanize } from "@/lib/format";
 
 export default function IntegrityPanel({ taskId }: { taskId: string }) {
@@ -15,12 +14,6 @@ export default function IntegrityPanel({ taskId }: { taskId: string }) {
     setIsVerifying(true);
     setError(null);
     try {
-      // Static preview records (demo-*) are served locally, not from the API.
-      const demo = getDemoVerify(taskId);
-      if (demo) {
-        setResult(demo);
-        return;
-      }
       setResult(await api.verifyDecision(taskId));
     } catch {
       setError("Unable to verify integrity. Please try again.");

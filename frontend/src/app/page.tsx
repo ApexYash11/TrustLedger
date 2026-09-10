@@ -1,8 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, DecisionListResponse, TaskSummary } from "@/lib/api";
-import { DEMO_CARDS } from "@/lib/demoData";
+import { api, ApiError, AgentOut, DecisionListResponse, TaskSummary } from "@/lib/api";
 import TaskCard from "@/components/TaskCard";
 import Sidebar from "@/components/Sidebar";
 
@@ -14,14 +13,19 @@ const COLUMN_LABELS: Record<string, string> = {
   completed: "Completed",
 };
 
-const DEMO: DecisionListResponse = {
-  total: DEMO_CARDS.length,
-  decisions: DEMO_CARDS,
-};
+/** Which backend agent runs a new card. ResearchAgent seals a full live
+ *  decision (trail + replay + integrity); ComplianceBot is the second lane. */
+const AGENT_CHOICES = [
+  { label: "Research Agent", name: "ResearchAgent", domain: "deloitte_client_research" },
+  { label: "Compliance Bot", name: "ComplianceBot", domain: "regulatory_compliance" },
+];
+
+const EMPTY: DecisionListResponse = { total: 0, decisions: [] };
 
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DecisionListResponse>(DEMO);
+  const [data, setData] = useState<DecisionListResponse>(EMPTY);
+  const [agents, setAgents] = useState<AgentOut[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [modalCol, setModalCol] = useState<string | null>(null);
@@ -38,16 +42,15 @@ export default function DashboardPage() {
       .listDecisions()
       .then((res) => {
         // Guard again in case drag started between fetch and resolve
-        if (!isDraggingRef.current)
-          // Static preview cards are kept alongside live data so the board
-          // layout can be evaluated as it will look with a full agent run.
-          setData({ total: res.total + DEMO.decisions.length, decisions: [...DEMO.decisions, ...res.decisions] });
+        if (!isDraggingRef.current) setData(res);
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     refresh();
+    // Live agent roster for the New Task modal (falls back to defaults).
+    api.listAgents().then((res) => setAgents(res.agents)).catch(() => {});
     const timer = setInterval(refresh, 30000);
     // Live SSE feed (issue #14): in-flight queued -> running -> completed card
     // movement arrives within ~1-3s while the 30s poll stays as a resync fallback.
@@ -123,15 +126,6 @@ export default function DashboardPage() {
     const target = deleteTarget;
     if (!target) return;
     const taskId = target.task_id;
-    // Local-only demo cards vanish immediately; nothing to delete server-side.
-    if (taskId.startsWith("local-") || taskId.startsWith("demo-")) {
-      setData((prev) => ({
-        total: prev.total - 1,
-        decisions: prev.decisions.filter((d) => d.task_id !== taskId),
-      }));
-      setDeleteTarget(null);
-      return;
-    }
     api
       .deleteDecision(taskId)
       .then(() => {
@@ -166,24 +160,85 @@ export default function DashboardPage() {
     applyStatus(taskId, col);
   };
 
-  const addTask = (col: string, title: string, caseType: string) => {
-    const newCard: TaskSummary = {
-      task_id: `local-${Date.now()}`,
-      case_id: title,
-      case_type: caseType || "Research",
-      agent_name: "Unassigned",
-      status: col,
-      risk_level: null,
-      outcome: null,
-      outcome_summary: null,
-      duration_seconds: null,
-      human_review_status: null,
-      created_at: new Date().toISOString(),
-    };
-    setData((prev) => ({
-      total: prev.total + 1,
-      decisions: [newCard, ...prev.decisions],
-    }));
+  const [runAgentOpen, setRunAgentOpen] = useState(false);
+  const [promptRunning, setPromptRunning] = useState(false);
+
+  // Prompt -> live agent: queue a REAL task on the backend. The dispatcher
+  // claims it in ~2s, the agent streams ledger events, and the card moves
+  // Queued -> Running -> Completed/Review live over SSE (no placeholders).
+  const runPromptTask = (prompt: string, agentDomain: string) => {
+    const text = prompt.trim();
+    if (!text) return;
+    const choice = AGENT_CHOICES.find((a) => a.domain === agentDomain) ?? AGENT_CHOICES[0];
+    const registered = agents.find((a) => a.domain === choice.domain);
+    const agentId = registered?.agent_id;
+    if (!agentId) {
+      alert(
+        `No "${choice.label}" registered on the backend yet. ` +
+          `Register via POST /api/v1/agents (name=${choice.name}, domain=${choice.domain}), then try again.`
+      );
+      return;
+    }
+    setPromptRunning(true);
+    api
+      .queueDecision({
+        agent_id: agentId,
+        case_id: text.length > 80 ? text.slice(0, 80) : text,
+        case_type: "Prompt run",
+        inputs: {
+          client_name: text.length > 80 ? text.slice(0, 80) : text,
+          research_question: text,
+        },
+      })
+      .then(() => {
+        setRunAgentOpen(false);
+        refresh();
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          alert("Agent not found on the backend - refresh and try again.");
+        } else {
+          alert("Could not queue this task on the backend. Is the API running?");
+        }
+      })
+      .finally(() => setPromptRunning(false));
+  };
+
+  // "+" buttons on columns still queue real agent tasks (title + case type).
+  const addTask = (col: string, title: string, caseType: string, agentDomain: string) => {
+    const choice = AGENT_CHOICES.find((a) => a.domain === agentDomain) ?? AGENT_CHOICES[0];
+    const registered = agents.find((a) => a.domain === choice.domain);
+    const agentId = registered?.agent_id;
+    // Queue a REAL task on the backend: the dispatcher claims it in ~2s, the
+    // agent streams ledger events, and the card moves Queued -> Running ->
+    // Completed/Review live over SSE. New cards always start queued; the
+    // column the modal was opened from is just UI context.
+    if (!agentId) {
+      alert(
+        `No "${choice.label}" registered on the backend yet. ` +
+        `Queue one via POST /api/v1/agents (name=${choice.name}, domain=${choice.domain}), then try again.`
+      );
+      return;
+    }
+    void col;
+    api
+      .queueDecision({
+        agent_id: agentId,
+        case_id: title,
+        case_type: caseType || "Market Entry Assessment",
+        inputs: {
+          client_name: title,
+          research_question: caseType || title,
+        },
+      })
+      .then(() => refresh())
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          alert("Agent not found on the backend - refresh and try again.");
+        } else {
+          alert("Could not queue this task on the backend. Is the API running?");
+        }
+      });
   };
 
   return (
@@ -202,13 +257,43 @@ export default function DashboardPage() {
             {liveOn ? "Live updates on" : "Connecting live feed (30s polling fallback)"}
           </p>
         </div>
-        <button
-          onClick={() => setModalCol("queued")}
-          className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700"
-        >
-          Add Task
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setRunAgentOpen(true)}
+            className="rounded-md border border-stone-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-stone-800 transition-colors hover:bg-stone-100"
+          >
+            Run agent
+          </button>
+          <button
+            onClick={() => setModalCol("queued")}
+            className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700"
+          >
+            Add Task
+          </button>
+        </div>
       </div>
+      {/* Prompt bar: type a prompt, run a live agent, watch the card move. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const input = (e.currentTarget.elements.namedItem("prompt") as HTMLInputElement | null)?.value ?? "";
+          runPromptTask(input, AGENT_CHOICES[0].domain);
+        }}
+        className="mb-6 flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/60 p-2 pl-4"
+      >
+        <input
+          name="prompt"
+          placeholder="Ask the research agent - e.g. Should Tata Power enter Rajasthan EV charging in FY27?"
+          className="flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+        />
+        <button
+          type="submit"
+          disabled={promptRunning}
+          className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {promptRunning ? "Running..." : "Run"}
+        </button>
+      </form>
         {/* Board */}
         <div className="grid grid-cols-4 gap-4">
           {COLUMNS.map((col) => {
@@ -279,6 +364,13 @@ export default function DashboardPage() {
       {modalCol && (
         <NewTaskModal col={modalCol} onClose={() => setModalCol(null)} onCreate={addTask} />
       )}
+      {runAgentOpen && (
+        <RunAgentModal
+          running={promptRunning}
+          onClose={() => setRunAgentOpen(false)}
+          onRun={(prompt, agentDomain) => runPromptTask(prompt, agentDomain)}
+        />
+      )}
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"
@@ -314,6 +406,74 @@ export default function DashboardPage() {
   );
 }
 
+function RunAgentModal({
+  running,
+  onClose,
+  onRun,
+}: {
+  running: boolean;
+  onClose: () => void;
+  onRun: (prompt: string, agentDomain: string) => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [agentDomain, setAgentDomain] = useState(AGENT_CHOICES[0].domain);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="mb-1 text-base font-semibold tracking-tight text-stone-900">
+          Run agent <span className="font-normal text-stone-400">from a prompt</span>
+        </h2>
+        <p className="mb-4 text-[12px] leading-relaxed text-stone-500">
+          Your prompt becomes the agent&apos;s research question. It runs live on the backend
+          and the card moves Queued - Running - Completed/Review on this board.
+        </p>
+        <label className="mb-1 block text-xs font-medium text-stone-500">Prompt</label>
+        <textarea
+          autoFocus
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={3}
+          placeholder="e.g. Should Tata Power enter Rajasthan EV charging in FY27?"
+          className="mb-3 w-full resize-none rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
+        />
+        <label className="mb-1 block text-xs font-medium text-stone-500">Agent</label>
+        <select
+          value={agentDomain}
+          onChange={(e) => setAgentDomain(e.target.value)}
+          className="mb-5 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
+        >
+          {AGENT_CHOICES.map((a) => (
+            <option key={a.domain} value={a.domain}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-stone-200 px-3 py-1.5 text-[13px] font-medium text-stone-600 transition-colors hover:bg-stone-100"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!prompt.trim() || running}
+            onClick={() => onRun(prompt, agentDomain)}
+            className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {running ? "Running..." : "Run agent"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NewTaskModal({
   col,
   onClose,
@@ -321,10 +481,11 @@ function NewTaskModal({
 }: {
   col: string;
   onClose: () => void;
-  onCreate: (col: string, title: string, caseType: string) => void;
+  onCreate: (col: string, title: string, caseType: string, agentDomain: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [caseType, setCaseType] = useState("");
+  const [agentDomain, setAgentDomain] = useState(AGENT_CHOICES[0].domain);
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4"
@@ -334,9 +495,12 @@ function NewTaskModal({
         className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-base font-semibold tracking-tight text-stone-900">
-          New Task <span className="font-normal text-stone-400">in {COLUMN_LABELS[col]}</span>
+        <h2 className="mb-1 text-base font-semibold tracking-tight text-stone-900">
+          New live task <span className="font-normal text-stone-400">runs a real agent</span>
         </h2>
+        <p className="mb-4 text-[12px] leading-relaxed text-stone-500">
+          Queued on the backend now, claimed by the dispatcher in ~2s, card moves live.
+        </p>
         <label className="mb-1 block text-xs font-medium text-stone-500">Title</label>
         <input
           autoFocus
@@ -350,8 +514,20 @@ function NewTaskModal({
           value={caseType}
           onChange={(e) => setCaseType(e.target.value)}
           placeholder="e.g. Due Diligence"
-          className="mb-5 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
+          className="mb-3 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
         />
+        <label className="mb-1 block text-xs font-medium text-stone-500">Agent</label>
+        <select
+          value={agentDomain}
+          onChange={(e) => setAgentDomain(e.target.value)}
+          className="mb-5 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400"
+        >
+          {AGENT_CHOICES.map((a) => (
+            <option key={a.domain} value={a.domain}>
+              {a.label}
+            </option>
+          ))}
+        </select>
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
@@ -362,12 +538,12 @@ function NewTaskModal({
           <button
             disabled={!title.trim()}
             onClick={() => {
-              onCreate(col, title.trim(), caseType.trim());
+              onCreate(col, title.trim(), caseType.trim(), agentDomain);
               onClose();
             }}
             className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Create
+            Queue live task
           </button>
         </div>
       </div>
