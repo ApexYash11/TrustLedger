@@ -1,14 +1,14 @@
 # TrustLedger — Current Status
 
-> **Last updated:** 25 August 2026 (Week 2 of 4)
-> **Audience:** Mentors, team, evaluators
-> **Companion doc:** `09_HLD.md` (High-Level Design)
+> **Last updated:** 14 September 2026 (Week 4)  
+> **Branch:** `feat/live-research-openrouter` → PR #22 · `docs/refresh-readme-and-docs` (this refresh)  
+> **Companion:** `09_HLD.md` (HLD) · `13_Review_Coverage_and_Load_Plan.md` · `14_Frontend_Realism_Plan.md`
 
 ---
 
 ## 1. One-Paragraph Status
 
-The full backend is **implemented, tested, and live**: the complete logging API (start → events → complete), SHA-256 hash-chain sealing, decision retrieval, replay assembly, and integrity verification — with automated coverage and a live end-to-end smoke test completed. The frontend has a working Kanban Command Center and a four-tab Decision Overview (Summary, Decision Trail, Replay, and Integrity). The prototype domain has pivoted to **Deloitte client research** — the simulated `ResearchAgent` and 16-record research seed are done (hero RES-2026-004821 + pre-tampered RES-2026-009999). Remaining: demo rehearsal and final polish.
+TrustLedger is **live with real streaming research**: OpenRouter `openrouter/free` router (free, no credits) drives `ResearchAgent` v1.3.0 via `POST /api/v1/research/stream` (`status → token* → done` SSE), sealing each run as a hash-chained, graph-shaped decision record (evidence/policy nodes linked to the recommendation, visualized in `DecisionGraph`). Board is minimal (single `Add Task`, `Ask a research question…` prompt, no stats/filter noise), detail dedupes `What was asked` and shows the knowledge graph hero. Backend `23/23` tests pass, frontend builds `5.94kB`, seed `16` records plus live stream records (tampered `RES-2026-009999` demonstrates `verify: broken`). Superseded PRs #11, #18, #19 closed into #22.
 
 ---
 
@@ -18,150 +18,112 @@ The full backend is **implemented, tested, and live**: the complete logging API 
 Week 1          Week 2          Week 3          Week 4
 Aug 18–24       Aug 25–31       Sep 1–7         Sep 8–14
 ─────────────   ─────────────   ─────────────   ─────────────
-Product +   ✔   Backend +   ◉   Dashboard + ▫   Integrity + ▫
-Architecture    Agent           Audit Trail     Polish + Demo
-                (backend done,
-                agent+seed left)
+Product +   ✔   Backend +   ✔   Dashboard + ✔   Streaming + ✔
+Architecture    Agent+Seed      Trail/Replay    Graph+Polish
+                                            PR #22 + docs refresh
 ```
 
-✔ done · ◉ in progress · ▫ not started
+✔ done (Week 4 covers prior “Integrity + Polish + Demo” plus streaming research)
 
-| Week 2 deliverable | Status |
-|---|---|
-| PostgreSQL schema (5 tables) | ✅ Done |
-| `POST /decisions/start` | ✅ Done |
-| `POST /decisions/{id}/events` | ✅ Done |
-| `POST /decisions/{id}/complete` (seal + hash chain) | ✅ Done |
-| `GET /decisions/{id}` | ✅ Done |
-| `GET /decisions` (list + filters) | ✅ Done |
-| `GET /decisions/{id}/verify` | ✅ Done |
-| Hash chain unit tests (append, verify, tamper) | ✅ Done |
-| Simulated research agent (`agents/research_agent.py`) | ✅ Done |
-| Seed script (16 research demo records) | ✅ Done |
-| Docker Compose running locally | ✅ Done (Docker unavailable on dev laptop; compose file ready) |
+| Deliverable | Status | Notes |
+|-------------|--------|-------|
+| PostgreSQL schema (5 tables) | ✅ Done | `models.py` 5 tables, JSONB, unique constraints |
+| `POST /decisions/start|events|complete` (seal + hash) | ✅ Done | `routes/decisions.py` 9 endpoints |
+| `POST /research/stream` SSE | ✅ Done | `routes/research.py:19` — streaming LLM + ledger seal |
+| `GET /decisions/{id}{/replay|/verify}` + `GET /decisions/chain/verify` | ✅ Done | `hash_chain.py:GENESIS`, `sealer.py`, `replay.py` |
+| OpenRouter LLM service | ✅ Done | `services/llm.py:1` — `openrouter/free`, fallback to template, 60s timeout |
+| ResearchAgent + ComplianceBot | ✅ Done | `research_agent.py:1.3.0` LLM+template, `dispatcher_loop` 0.7s |
+| Seed (16 + live) | ✅ Done | `demo_data.json` 5 hand-crafted + 7 quick + 2 running + 2 queued; live stream adds `RES-…-e97325` etc |
+| Board (minimal) + Detail (4 tabs) + Graph | ✅ Done | `page.tsx:5.94kB` minimal, `decisions/[taskId]:7.48kB` with `DecisionGraph.tsx` |
+| Docker Compose | ✅ Ready | `postgres + backend + frontend`, `env_file .env` |
+| Tests `23/23` | ✅ Done | 5 hash + 7 API + 11 runtime/integrity/dispatcher |
 
-**Week 2 exit check (agent+seed done):** fetch `RES-2026-004821`, show JSON with trail + hash; all seed records verify green except the pre-tampered `RES-2026-009999`.
+**Exit check:** Type a question on the board → tokens stream, card moves `queued → running → completed/review_required`, click → Graph shows client→question→evidence/policy→outcome, Trail/Replay/Verify all green except tampered `RES-2026-009999`.
 
 ---
 
 ## 3. What Exists in Code Today
 
 ```
-TrustLedger/  (branch: yash → PR #1 → main)
+TrustLedger/  (PR #22 → this docs refresh)
 ├── backend/
-│   ├── agents/                     ResearchAgent (drives the API)
-│   │   └── research_agent.py       replays seed scenarios
-│   ├── seed/                      demo_data.json (16 research scenarios)
-│   │   └── load_demo_data.py      loads + tampers one record for the demo
-│   ├── app/
-│   │   ├── main.py               FastAPI app, lifespan, CORS (localhost:3000)
-│   │   ├── db.py                 SQLAlchemy; SQLite default, Postgres via env
-│   │   ├── models.py             5 tables, JSONB on Postgres, uniqueness constraints
-│   │   ├── schemas.py            Pydantic request/response contracts
-│   │   ├── routes/
-│   │   │   ├── agents.py         POST /agents
-│   │   │   └── decisions.py      full lifecycle + read paths (9 endpoints)
-│   │   └── services/
-│   │       ├── canonical_json.py deterministic JSON (sorted keys)
-│   │       ├── hash_chain.py     SHA-256 chain + GENESIS seed
-│   │       ├── sealer.py         snapshot assembly + sealing
-│   │       └── replay.py         ordered step reconstruction
-│   ├── tests/                    12 tests — all passing
-│   ├── Dockerfile                non-root user
-│   └── requirements.txt
+│   ├── app/services/llm.py         OpenRouter streaming (openrouter/free)
+│   ├── app/routes/research.py      POST /research/stream SSE (status/token/done)
+│   ├── app/routes/decisions.py     9 endpoints + stream + verify chain
+│   ├── agents/research_agent.py    LLM+template, 1.3.0
+│   ├── app/main.py                 lifespan, CORS, dispatcher 0.7s
+│   └── tests/                      23 tests
 ├── frontend/
-│   ├── src/app/page.tsx          Kanban Command Center (4 columns, 30s poll)
-│   ├── src/app/decisions/[taskId]/page.tsx   Four-tab Decision Overview
-│   ├── src/components/DecisionTimeline.tsx   Sequenced decision trail
-│   ├── src/components/ReplayViewer.tsx       Stored-record replay viewer
-│   ├── src/components/IntegrityPanel.tsx     Live integrity verification
-│   ├── src/lib/api.ts            fully typed API client
-│   └── tailwind.config.js        Tailwind adopted per docs/05
-├── docker-compose.yml            postgres + backend + frontend (env_file, healthcheck)
-└── docs/                         design docs + this status doc
+│   ├── src/app/page.tsx            minimal board (no stats/filter/tip)
+│   ├── src/app/decisions/[taskId]/page.tsx  deduped What was asked + DecisionGraph hero
+│   ├── src/components/DecisionGraph.tsx      SVG graph (supports/applies_to)
+│   ├── src/components/Sidebar.tsx  Board only, no AI-decides card
+│   └── src/lib/api.ts              streamResearch SSE client
+├── docs/13_Review_Coverage_and_Load_Plan.md  skip-review + <400ms plan
+├── docs/14_Frontend_Realism_Plan.md         Deloitte-grade realism plan
+└── .env.example                    OPENROUTER_API_KEY, TRUSTLEDGER_MODEL=openrouter/free
 ```
 
 ---
 
 ## 4. Verification Evidence
 
-### Automated tests — 12/12 passing
-
+### Automated tests — 23/23 passing
 | Suite | Proves |
-|---|---|
-| Hash chain (5 tests) | canonical JSON determinism · SHA-256 format · same-input-same-hash · **tamper detection** · chain linking |
-| API flow (7 tests) | full lifecycle → verify pass · **tampered record fails verification** · 409 on event-after-seal · 422 missing rationale fields · 404 unknown agent · list filters · whole-chain verify |
-| Regression | event sequences unique + ordered (guards the duplicate-sequence bug found in review) |
+|-------|--------|
+| Hash chain (5) | canonical JSON determinism, SHA-256, tamper detection, chain linking |
+| API flow (7) | lifecycle verify pass, tampered fails, 409 sealed, 422 rationale, 404 agent, list filters, chain verify |
+| Runtime/dispatcher (11) | queued→running claim, no double-claim, idempotent register, terminal guard, requeue on crash, SSE |
 
-### Live smoke test (real uvicorn + HTTP)
-
+### Live streaming test (Sep 14, `openrouter/free`)
 ```
-register agent → start RES-2026-004821 → log evidence event
-→ complete (conditional recommendation, review required)
-→ sealed: hash 96fbfec5…b40f
-→ verify: True / chain_status: intact
-→ chain verify: "All 1 records in chain verified."
+POST /research/stream "Should Tata Power enter Rajasthan EV charging in FY27?"
+→ status: Research started (task ...-e97325, running)
+→ tokens: { primary_reason, supporting_factors, evidence_details[3], policy_details[3] } streamed
+→ done: recommended_with_caveats, review_required
+→ verify: True / intact / chain #17
+→ replay: 9 steps, evidence 2, policies 2
 ```
 
-### Quality gates on PR #1
-
-- ✅ GitGuardian secret scan — passing (one false-positive incident resolved; no credentials in repo)
-- ✅ CodeRabbit review — 14 findings triaged and addressed (JSONB, CORS, sequence atomicity, Docker hardening, frontend typing)
-- ✅ Peer review fixes applied (JSONB variant, CORS origin, single-seal refactor, lifespan handler, Tailwind adoption)
+### Quality gates
+- PR #22: `frontend build` ✔, `23 tests` ✔, GitGuardian incident 36592553 triaged (env_file, no secrets in code)
+- Prior PRs #11/#18/#19 closed as superseded by #22
 
 ---
 
-## 5. Key Decisions Made During Implementation
-
+## 5. Key Decisions Since Last Update
 | Decision | Rationale |
-|---|---|
-| SQLite default, Postgres via env | No Docker on dev laptop; tests stay fast; compose ready for Postgres |
-| Evidence/policies embedded in event `details` (JSONB) | Prototype speed per `02_Data_Driven_Design.md`; normalization deferred |
-| `env_file` for all container secrets | GitGuardian requires zero credential patterns in code |
-| Tailwind now, shadcn/ui at Week 3 kickoff | Tailwind was the blocking dependency; component picks belong with real dashboard build |
-| Seal-on-complete even for review-required tasks | Matches documented lifecycle in `03_Agent_Based_Design.md` |
+|----------|-----------|
+| `openrouter/free` as default model | Real streaming with 0 credits; paid `gpt-4o-mini` needs 402 |
+| `POST /research/stream` SSE instead of only `/decisions/queue` + dispatcher | User-requested query→streaming→record flow; prompt bar streams live |
+| `DecisionGraph` SVG in Summary | User-requested decision tree linking evidence/policy → outcome (was missing) |
+| Remove board stats/filter/tip + sidebar AI-decides card + column Add Task duplicates | User-requested declutter: fewer buttons/text, single Add Task |
+| Dedupe `What was asked` to Q + Client + Case type | Fixes 3× duplicate rows on running tasks |
+| Dispatcher `0.7s` (was 2s), poll `10s` fallback + SSE primary | Lower perceived latency per `13_Review_Coverage_and_Load_Plan.md` |
 
 ---
 
-## 6. Known Limitations (Intentional, Prototype Scope)
-
-- No authentication / RBAC (per `08_Scope_and_Non_Goals.md`)
-- Hash chain on standard DB — a DB writer could rewrite it (documented in `09_HLD.md` §6; production would add HMAC/external signing)
-- Chain-head allocation not serialized across concurrent writers (single-user demo)
-- Seed data + simulated agent not yet loaded (next task)
-- Docker not installable on the primary dev laptop — compose untested end-to-end (file follows standard patterns; will validate on a machine with Docker)
+## 6. Known Limitations (Intentional)
+- No auth/RBAC (per `08_Scope_and_Non_Goals.md`)
+- Hash on standard DB, chain-head not serialized across concurrent sealers (single-user demo)
+- Free-model latency (swap `TRUSTLEDGER_MODEL` to paid model for production speed)
+- `GET /decisions` not yet paginated/joined-load optimized (see `13_…Plan.md` B1)
 
 ---
 
-## 7. Next Steps (In Order)
-
-1. **Simulated research agent** — scripted lifecycle with varied outcomes (approved / partial / denied / escalated)
-2. **Seed data** — 15+ records across all Kanban columns, hero case `RES-2026-004821`, one pre-tampered record `RES-2026-009999`
-3. **Week 2 exit check** — all seeds verify green, chain verify-all passes
-4. **Week 3** — full demo click-through using the Decision Overview tabs
-5. **Week 4** — tamper contrast demo, polish, 3 rehearsals of the 4:20 script
+## 7. Next Steps
+1. Merge PR #22, then this docs refresh PR
+2. Execute `13_Review_Coverage_and_Load_Plan.md` A/B (skipped 10 → issues + dashboard <400ms)
+3. Execute `14_Frontend_Realism_Plan.md` P1–P4 in parallel (board/record polish)
+4. Demo rehearsal with live prompt `DMart quick-commerce Pune?` or hero `RES-2026-004821`
 
 ---
 
-## 8. How to Run (Current State)
-
+## 8. How to Run (Current)
 ```bash
-# Backend (no Docker needed — SQLite default)
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-# → API docs: http://localhost:8000/docs
-
-# Run tests
-cd backend && python -m pytest tests -q
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-# → Dashboard: http://localhost:3000
-
-# Full stack with PostgreSQL (requires Docker)
-cp .env.example .env   # set POSTGRES_PASSWORD
-docker compose up --build
+cp .env.example .env  # set OPENROUTER_API_KEY=sk-or-v1-... ; TRUSTLEDGER_MODEL=openrouter/free
+cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000  # :8000/docs
+cd backend && python -m pytest tests -q  # 23 passed
+cd frontend && npm install && npm run dev  # :3000 — Ask a research question… streams live
+docker compose up --build  # full stack
 ```

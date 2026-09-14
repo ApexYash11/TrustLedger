@@ -59,13 +59,13 @@ FastAPI serves:
 
 ---
 
-### AI Agent — Simulated Python Agent
+### AI Agent — OpenRouter LLM + Template Fallback
 
 | Factor | Decision |
 |--------|----------|
-| Primary | Scripted Python agent (`agents/research_agent.py`) calling TrustLedger API |
-| Optional | LLM API (OpenAI/Anthropic) for rationale generation — pay-per-use, EOI's one licensed component |
-| Why scripted first | Demo reliability — no API rate limits, no latency surprises during presentation |
+| Primary | `ResearchAgent` v1.3.0 calling OpenRouter (`openrouter/free` router, free) via `app/services/llm.py`, streaming via `POST /research/stream` — `ComplianceBot` second lane |
+| Fallback | Template `build_steps()` + hard-coded outcomes when `OPENROUTER_API_KEY` missing (tests/offline) |
+| Why hybrid | Real model for demo realism; template keeps CI and rate-limit resilience |
 
 ---
 
@@ -99,25 +99,33 @@ FastAPI serves:
 ```mermaid
 flowchart TB
     subgraph Client["Browser"]
-        Dashboard["Trust Dashboard<br/>(Next.js)"]
+        Dashboard["Trust Dashboard<br/>(Next.js + DecisionGraph)"]
     end
 
     subgraph Backend["Backend (FastAPI)"]
         API["Logging & Query API"]
+        StreamAPI["Research Stream API<br/>(POST /research/stream SSE)"]
+        LLM["OpenRouter LLM<br/>(openrouter/free)"]
         HashEngine["Hash Chain Engine"]
         ReplayEngine["Replay Engine"]
     end
 
     subgraph AgentLayer["Agent Layer"]
-        SimAgent["Simulated Research Agent<br/>(Python)"]
+        RAgent["ResearchAgent v1.3.0<br/>(LLM+template)"]
+        CAgent["ComplianceBot"]
+        Dispatcher["Dispatcher 0.7s + SSE"]
     end
 
     subgraph Storage["Storage"]
         PG["PostgreSQL<br/>(decisions, events,<br/>audit records)"]
     end
 
-    SimAgent -->|"POST /decisions/start<br/>POST /events<br/>POST /complete"| API
-    Dashboard -->|"GET /decisions<br/>GET /decisions/{id}<br/>GET /replay<br/>GET /verify"| API
+    RAgent --> LLM
+    RAgent -->|"POST /decisions/start<br/>POST /events<br/>POST /complete"| API
+    StreamAPI --> LLM
+    StreamAPI --> API
+    Dashboard -->|"POST /research/stream<br/>GET /decisions<br/>GET /decisions/{id}<br/>GET /replay<br/>GET /verify"| API
+    Dispatcher --> RAgent
     API --> HashEngine
     API --> ReplayEngine
     API --> PG
