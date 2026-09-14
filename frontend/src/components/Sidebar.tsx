@@ -20,10 +20,6 @@ export default function Sidebar() {
           <span className="block text-[10px] font-medium tracking-widest text-stone-400">AUDIT LAYER</span>
         </div>
       </div>
-      <p className="mb-4 rounded-md bg-white px-2.5 py-2 text-[11px] leading-relaxed text-stone-500 shadow-sm">
-        AI decides.<br /><span className="font-medium text-stone-700">TrustLedger records &amp; verifies.</span>
-      </p>
-
       <nav className="space-y-0.5">
         {NAV.map(({ label, href }) => (
           <Link

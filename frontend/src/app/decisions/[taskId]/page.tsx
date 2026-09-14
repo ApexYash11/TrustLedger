@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import DecisionGraph from "@/components/DecisionGraph";
 import DecisionTimeline from "@/components/DecisionTimeline";
 import IntegrityPanel from "@/components/IntegrityPanel";
 import ReplayViewer from "@/components/ReplayViewer";
@@ -83,15 +84,24 @@ function Summary({ record }: { record: FullDecisionRecord }) {
         </div>
       </div>
 
-      {/* What was asked */}
+      <DecisionGraph record={record} />
+
       <Card title="What was asked">
-        {inputs.length ? (
-          <dl className="mt-3 space-y-2.5 text-sm">
-            {inputs.map(([k, v]) => (
-              <div key={k} className="flex gap-3"><dt className="w-36 shrink-0 text-stone-500">{humanize(k)}</dt><dd className="font-medium text-stone-800 break-words">{typeof v === "string" ? v : JSON.stringify(v)}</dd></div>
-            ))}
-          </dl>
-        ) : <p className="mt-3 text-sm text-stone-500">No inputs recorded.</p>}
+        {(() => {
+          const q = String(task.inputs?.research_question ?? task.inputs?.prompt ?? task.case_id ?? "");
+          const client = String(task.inputs?.client_name ?? "");
+          const rows: [string, string][] = [];
+          if (q) rows.push(["Research question", q]);
+          if (client && client !== q) rows.push(["Client", client]);
+          rows.push(["Case type", String(task.case_type ?? "Prompt run")]);
+          return (
+            <dl className="mt-3 space-y-2 text-sm">
+              {rows.map(([k, v]) => (
+                <div key={k} className="flex gap-3"><dt className="w-36 shrink-0 text-stone-500">{k}</dt><dd className="font-medium text-stone-800 break-words">{v}</dd></div>
+              ))}
+            </dl>
+          );
+        })()}
       </Card>
 
       {/* Supporting factors */}

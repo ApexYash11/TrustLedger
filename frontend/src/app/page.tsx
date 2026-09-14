@@ -26,15 +26,7 @@ const AGENT_CHOICES = [
 
 const EMPTY: DecisionListResponse = { total: 0, decisions: [] };
 
-function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs">
-      <span className={`h-2 w-2 rounded-full ${accent}`} />
-      <span className="text-stone-500">{label}</span>
-      <span className="font-semibold text-stone-900">{value}</span>
-    </div>
-  );
-}
+
 
 export default function DashboardPage() {
   const [data, setData] = useState<DecisionListResponse>(EMPTY);
@@ -43,10 +35,6 @@ export default function DashboardPage() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [modalCol, setModalCol] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskSummary | null>(null);
-  const [liveOn, setLiveOn] = useState(false);
-  const [q, setQ] = useState("");
-  const [riskFilter, setRiskFilter] = useState<string>("");
-
   // Streaming research state
   const [streamOpen, setStreamOpen] = useState(false);
   const [streamTokens, setStreamTokens] = useState("");
@@ -62,16 +50,10 @@ export default function DashboardPage() {
 
   const refresh = useCallback(() => {
     if (isDraggingRef.current) return;
-    const params: Record<string, string | undefined> = {};
-    if (q.trim()) params.case_id = q.trim();
-    if (riskFilter) params.risk_level = riskFilter;
-    api
-      .listDecisions(Object.keys(params).length ? params : undefined)
-      .then((res) => {
-        if (!isDraggingRef.current) setData(res);
-      })
-      .catch(() => {});
-  }, [q, riskFilter]);
+    api.listDecisions().then((res) => {
+      if (!isDraggingRef.current) setData(res);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -81,8 +63,8 @@ export default function DashboardPage() {
     let es: EventSource | null = null;
     try {
       es = new EventSource(`${base}/api/v1/decisions/stream`);
-      es.onopen = () => setLiveOn(true);
-      es.onerror = () => setLiveOn(false);
+      es.onopen = () => {};
+      es.onerror = () => {};
       es.onmessage = (msg) => {
         try {
           const ev = JSON.parse(msg.data) as { event?: string; task_id?: string; status?: string };
@@ -171,8 +153,6 @@ export default function DashboardPage() {
     applyStatus(taskId, col);
   };
 
-  const [runAgentOpen, setRunAgentOpen] = useState(false);
-
   const runStreamingResearch = (prompt: string, agentDomain: string) => {
     const text = prompt.trim();
     if (!text) return;
@@ -213,7 +193,6 @@ export default function DashboardPage() {
         },
       )
       .then(() => {
-        setRunAgentOpen(false);
         refresh();
       })
       .catch(() => {
@@ -245,75 +224,32 @@ export default function DashboardPage() {
   };
 
   const filtered = data.decisions; // server-filtered via refresh params
-  const counts = {
-    queued: filtered.filter((d) => d.status === "queued").length,
-    running: filtered.filter((d) => d.status === "running").length,
-    review: filtered.filter((d) => d.status === "review_required" || d.status === "disputed").length,
-    completed: filtered.filter((d) => d.status === "completed").length,
-  };
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 bg-white p-8">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-[22px] font-bold tracking-tight text-stone-900">Research Command Center</h1>
-            <p className="mt-0.5 flex items-center gap-2 text-[12px] text-stone-500">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${liveOn ? "bg-emerald-500 animate-pulse" : "bg-stone-300"}`} />
-              {liveOn ? "Live — card moves in ~1s" : "Live feed connecting…"} · {data.total} records · hash-chained
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setRunAgentOpen(true)}
-              className="rounded-md border border-stone-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-stone-800 hover:bg-stone-50"
-            >
-              Run agent
-            </button>
-            <button
-              onClick={() => setModalCol("queued")}
-              className="rounded-md bg-stone-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-stone-700"
-            >
-              Add Task
-            </button>
-          </div>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-[22px] font-bold tracking-tight text-stone-900">Research Command Center</h1>
+          <button
+            onClick={() => setModalCol("queued")}
+            className="rounded-md bg-stone-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-stone-700"
+          >
+            Add Task
+          </button>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Stat label="Queued" value={counts.queued} accent="bg-stone-400" />
-          <Stat label="Running" value={counts.running} accent="bg-amber-400" />
-          <Stat label="Review" value={counts.review} accent="bg-violet-500" />
-          <Stat label="Completed" value={counts.completed} accent="bg-emerald-500" />
-          <div className="ml-auto flex items-center gap-2">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Filter by case ID…"
-              className="w-44 rounded-md border border-stone-200 px-2.5 py-1.5 text-xs outline-none focus:border-stone-400"
-            />
-            <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-xs outline-none">
-              <option value="">All risk</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Real streaming prompt bar */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             runStreamingResearch(promptInput, AGENT_CHOICES[0].domain);
           }}
-          className="mb-4 flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/60 p-2 pl-4 shadow-sm"
+          className="mb-4 flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2 pl-4"
         >
-          <span className="hidden text-xs font-medium text-stone-400 sm:inline">Ask the agent</span>
           <input
             value={promptInput}
             onChange={(e) => setPromptInput(e.target.value)}
-            placeholder="Should Tata Power enter Rajasthan EV charging in FY27?  → streams live via OpenRouter"
+            placeholder="Ask a research question…"
             className="flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
           />
           <button
@@ -321,13 +257,8 @@ export default function DashboardPage() {
             disabled={promptRunning || !promptInput.trim()}
             className="rounded-md bg-stone-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-stone-700 disabled:opacity-40"
           >
-            {promptRunning ? "Streaming…" : "Run"}
+            {promptRunning ? "…" : "Run"}
           </button>
-          {streamOpen && (
-            <button type="button" onClick={() => setStreamOpen((v) => !v)} className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-600">
-              {streamOpen ? "Hide" : "Show"} stream
-            </button>
-          )}
         </form>
 
         {/* Streaming live viewer */}
@@ -374,12 +305,9 @@ export default function DashboardPage() {
                 onDrop={() => onDrop(col)}
                 className={`rounded-xl border bg-stone-50/60 p-3 transition-colors ${COLUMN_ACCENT[col]} border-t-2 ${dragOverCol === col ? "bg-white ring-1 ring-stone-300" : "border-stone-100"}`}
               >
-                <div className="mb-3 flex items-center justify-between px-1">
-                  <h2 className="flex items-center gap-2 text-[13px] font-semibold text-stone-700">
-                    {COLUMN_LABELS[col]}
-                    <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-medium text-stone-600 shadow-sm">{cards.length}</span>
-                  </h2>
-                  <button title="Add task" onClick={() => setModalCol(col)} className="rounded px-1.5 text-stone-400 hover:bg-white hover:text-stone-700">+</button>
+                <div className="mb-3 flex items-center gap-2 px-1">
+                  <h2 className="text-[13px] font-semibold text-stone-700">{COLUMN_LABELS[col]}</h2>
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-medium text-stone-600 shadow-sm">{cards.length}</span>
                 </div>
                 <div className="space-y-3">
                   {cards.length === 0 && (
@@ -396,22 +324,15 @@ export default function DashboardPage() {
                       <TaskCard card={card} onStatusChange={applyStatus} onDelete={setDeleteTarget} />
                     </div>
                   ))}
-                  <button
-                    onClick={() => setModalCol(col)}
-                    className="w-full rounded-lg border border-dashed border-stone-200 bg-white/40 py-3 text-[13px] text-stone-400 hover:border-stone-400 hover:text-stone-600"
-                  >
-                    Add Task
-                  </button>
+
                 </div>
               </section>
             );
           })}
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-stone-400">Tip: type a question above and watch the card move Queued → Running → Completed live. Poll fallback 10s · dispatch 0.7s · SSE instant</p>
       </main>
       {modalCol && <NewTaskModal col={modalCol} onClose={() => setModalCol(null)} onCreate={addTask} />}
-      {runAgentOpen && <RunAgentModal running={promptRunning} onClose={() => setRunAgentOpen(false)} onRun={(prompt, domain) => runStreamingResearch(prompt, domain)} />}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4" onClick={() => setDeleteTarget(null)}>
           <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -424,31 +345,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function RunAgentModal({ running, onClose, onRun }: { running: boolean; onClose: () => void; onRun: (prompt: string, agentDomain: string) => void }) {
-  const [prompt, setPrompt] = useState("");
-  const [agentDomain, setAgentDomain] = useState(AGENT_CHOICES[0].domain);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-1 text-base font-semibold text-stone-900">Run agent <span className="font-normal text-stone-400">streaming</span></h2>
-        <p className="mb-4 text-[12px] text-stone-500">Streams live tokens via OpenRouter. Card moves on the board as events are written.</p>
-        <label className="mb-1 block text-xs font-medium text-stone-500">Prompt</label>
-        <textarea autoFocus value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder="e.g. Should Tata Power enter Rajasthan EV charging in FY27?" className="mb-3 w-full resize-none rounded-md border border-stone-200 px-3 py-2 text-sm outline-none focus:border-stone-400" />
-        <label className="mb-1 block text-xs font-medium text-stone-500">Agent</label>
-        <select value={agentDomain} onChange={(e) => setAgentDomain(e.target.value)} className="mb-5 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm outline-none">
-          {AGENT_CHOICES.map((a) => (
-            <option key={a.domain} value={a.domain}>{a.label}</option>
-          ))}
-        </select>
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-stone-200 px-3 py-1.5 text-[13px]">Cancel</button>
-          <button disabled={!prompt.trim() || running} onClick={() => onRun(prompt, agentDomain)} className="rounded-md bg-stone-900 px-3.5 py-1.5 text-[13px] font-medium text-white disabled:opacity-40">{running ? "Streaming…" : "Run agent"}</button>
-        </div>
-      </div>
     </div>
   );
 }
