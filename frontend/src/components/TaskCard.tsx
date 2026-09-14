@@ -67,7 +67,7 @@ export default function TaskCard({
   return (
     <div
       draggable
-      className="card-hover relative cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-card active:cursor-grabbing"
+      className="card-hover group relative cursor-grab rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition-all hover:shadow-md active:cursor-grabbing"
     >
       {/* Link layer covers the whole card except the options button */}
       <a

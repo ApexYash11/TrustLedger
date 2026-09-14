@@ -171,4 +171,36 @@ export const api = {
   deleteDecision: (taskId: string) => del(`/decisions/${taskId}`),
   queueDecision: (body: { agent_id: string; case_id: string; case_type: string; inputs: Record<string, unknown> }) =>
     post<{ task_id: string; status: string; created_at: string }>("/decisions/queue", body),
+  streamResearch: (
+    body: { query: string; agent_domain?: string; client_name?: string; case_type?: string },
+    onEvent: (ev: { type: string; token?: string; message?: string; task_id?: string; case_id?: string; status?: string; outcome?: string }) => void,
+    onError?: (msg: string) => void,
+  ) => {
+    const url = `${API_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/research/stream`;
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(async (res) => {
+      if (!res.ok || !res.body) throw new Error(`Research stream failed: ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          try {
+            const ev = JSON.parse(line.slice(5).trim());
+            onEvent(ev);
+          } catch {}
+        }
+      }
+    }).catch((e) => { onError?.(String(e)); throw e; });
+  },
 };

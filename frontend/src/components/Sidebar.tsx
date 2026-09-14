@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { label: "Home", href: "/" },
+  { label: "Board", href: "/" },
 ];
 
 export default function Sidebar() {
@@ -15,9 +15,11 @@ export default function Sidebar() {
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-stone-900 text-[11px] font-bold text-white">
           TL
         </div>
-        <span className="text-sm font-semibold tracking-tight text-stone-900">TrustLedger</span>
+        <div>
+          <span className="block text-sm font-semibold tracking-tight text-stone-900">TrustLedger</span>
+          <span className="block text-[10px] font-medium tracking-widest text-stone-400">AUDIT LAYER</span>
+        </div>
       </div>
-
       <nav className="space-y-0.5">
         {NAV.map(({ label, href }) => (
           <Link
