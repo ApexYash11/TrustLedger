@@ -31,45 +31,47 @@ If unsolved, AI stays confined to low-stakes work.
 TrustLedger sits between the agent and the people who need to trust its output:
 
 ```
-AI Agent → Logging API → Hash-Chained Immutable Log → Trust Dashboard → Decision Replay
+AI Agent (ResearchAgent via OpenRouter) → Logging API + Research Stream → Hash-Chained Log → Knowledge Graph → Trust Dashboard → Replay/Verify
 ```
 
 A standardized **decision record** is created live, containing:
 
 - Inputs and outputs
-- Evidence retrieved during the decision
-- Policy clauses applied
+- Evidence retrieved during the decision (typed `evidence` nodes)
+- Policy clauses applied (typed `policy_reference` nodes)
 - Structured rationale (never raw model chain-of-thought)
-- Chronological decision events
-- Tamper-evident hash chain
+- Chronological decision events + knowledge-graph edges (`supports` / `applies_to` / `validates`)
+- Tamper-evident SHA-256 hash chain
 
-The same core schema works across industries; only the methodology/standard references change. The prototype demonstrates this on **Deloitte client research** (market entry studies, vendor due diligence, M&A screening, pricing benchmarks).
+The same core schema works across industries; only the methodology/standard references change. The prototype demonstrates this on **Deloitte client research** with streaming research via `POST /api/v1/research/stream` and a visual knowledge graph (`DecisionGraph`).
 
 ---
 
 ## How It Works
 
-1. An existing AI agent calls TrustLedger's logging API as it works (`start` → `events` → `complete`).
-2. TrustLedger stores each step, links evidence and policies, and seals the record with a SHA-256 hash chained to the previous record.
-3. A compliance officer opens the **Agent Command Center** (Kanban dashboard), clicks a task, and inspects the decision.
-4. They walk the **Decision Trail**, **Replay** the decision from stored data, and **Verify** that the record has not been altered.
+1. Query enters via `POST /api/v1/research/stream` (`{query, agent_domain}`) — or via `POST /decisions/queue` for dispatcher mode. The `ResearchAgent` calls OpenRouter (`openrouter/free` router, free) or falls back to template if no key.
+2. TrustLedger streams tokens (`data: {type:"token"}`) while appending linked evidence/policy events, then seals the record with a SHA-256 hash chained to the previous record.
+3. A compliance officer opens the **Research Command Center** (minimal Kanban), clicks a task, inspects the **Knowledge Graph** (client → question → evidence/policy → recommendation), walks the **Decision Trail**, **Replays** steps, and **Verifies** chain integrity.
+4. `GET /decisions/{id}/verify` and `GET /decisions/chain/verify` prove no post-seal tampering (tampered `RES-2026-009999` demonstrates failure).
 
-The agent keeps deciding. TrustLedger makes those decisions auditable.
+The agent keeps deciding. TrustLedger makes those decisions auditable and replayable.
 
 ---
 
 ## Architecture
 
 ```
-Browser (Next.js dashboard)
+Browser (Next.js dashboard — Kanban + DecisionGraph + Timeline/Replay/Integrity)
         │
         ▼
-FastAPI (logging, replay, verification)
+FastAPI (logging, research stream, replay, verification)
+        │  ├─ OpenRouter LLM service (app/services/llm.py — openrouter/free)
+        │  └─ Hash Chain Engine (SHA-256) + Replay Engine
         │
         ▼
-PostgreSQL (decision records + hash chain)
-
-Simulated Research Agent ──► FastAPI logging endpoints
+PostgreSQL (decisions, events, audit_records) — SQLite fallback for local/tests
+        │
+ResearchAgent / ComplianceBot ──► POST /research/stream (streaming) or POST /decisions/start|events|complete
 ```
 
 See `docs/05_Tech_Stack_and_Architecture.md` for the full diagram and rationale.
@@ -78,14 +80,13 @@ See `docs/05_Tech_Stack_and_Architecture.md` for the full diagram and rationale.
 
 ## Demo Flow (3–5 minutes)
 
-1. Open the Agent Command Center — see what agents are doing
-2. Click a high-risk disputed engagement
-3. Show the decision in plain language
-4. Walk the Decision Trail
-5. Show evidence and policy references
-6. Replay the decision
-7. Verify hash-chain integrity
-8. Close on business value: multi-day investigation → two-minute lookup
+1. Open Research Command Center — minimal board, `Ask a research question…`
+2. Type “Should DMart launch quick-commerce in Pune?” → watch tokens stream, card `Queued → Running → Completed`
+3. Click the new card → Knowledge Graph shows how evidence/policy link to the recommendation
+4. Walk Decision Trail (chronological why)
+5. Replay steps (read-only, no re-execution)
+6. Verify hash-chain integrity (green `Verified` vs red `Tampered` on `RES-2026-009999`)
+7. Close: multi-day investigation → two-minute lookup
 
 Full script: `docs/06_Demo_Showcase_Flow.md`
 
@@ -95,12 +96,13 @@ Full script: `docs/06_Demo_Showcase_Flow.md`
 
 | Layer | Choice |
 |-------|--------|
-| Frontend | Next.js, React, TypeScript, Tailwind |
-| Backend | FastAPI (Python) |
-| Database | PostgreSQL |
-| Integrity | SHA-256 hash chaining |
-| Agent | Simulated Python research agent (optional LLM API) |
-| Runtime | Docker Compose, local demo |
+| Frontend | Next.js 14, React, TypeScript, Tailwind — `DecisionGraph`, `DecisionTimeline`, `ReplayViewer`, `IntegrityPanel` |
+| Backend | FastAPI (Python) — logging, research SSE, replay, verify |
+| LLM | OpenRouter (`openrouter/free` router, `app/services/llm.py`); `TRUSTLEDGER_MODEL` env |
+| Database | PostgreSQL (JSONB) / SQLite fallback |
+| Integrity | SHA-256 hash chaining with `GENESIS` seed |
+| Agent | `ResearchAgent` v1.3.0 (`deloitte_client_research`) + `ComplianceBot`, dispatcher 0.7s, SSE live |
+| Runtime | Docker Compose + local `uvicorn`/`next dev`, 23 tests |
 
 ---
 
@@ -108,82 +110,74 @@ Full script: `docs/06_Demo_Showcase_Flow.md`
 
 ```
 TrustLedger/
-├── docs/                          Product and engineering documents
-│   ├── 00_Project_Summary.md
-│   ├── 01_PRD.md
-│   ├── 02_Data_Driven_Design.md
-│   ├── 03_Agent_Based_Design.md
-│   ├── 04_Dashboard_Design.md
-│   ├── 05_Tech_Stack_and_Architecture.md
-│   ├── 06_Demo_Showcase_Flow.md
-│   ├── 07_Weekly_Roadmap.md
-│   ├── 08_Scope_and_Non_Goals.md
-│   ├── 09_HLD.md
-│   └── 10_Current_Status.md
+├── docs/                          Product and engineering documents (00–14)
 ├── TrustLedger_EOI_Enhanced.pptx  Deloitte Capstone EOI (source of truth)
-├── backend/                       FastAPI app — implemented, tested (12/12 passing)
-├── frontend/                      Next.js dashboard — scaffold implemented
-└── README.md
+├── backend/                       FastAPI — 23 tests passing
+│   ├── app/services/llm.py        OpenRouter streaming service
+│   ├── app/routes/research.py     POST /research/stream SSE
+│   ├── agents/research_agent.py   LLM + template fallback
+│   └── app/services/hash_chain.py SHA-256
+├── frontend/                      Next.js — Kanban + Knowledge Graph + tabs
+│   ├── src/components/DecisionGraph.tsx
+│   └── src/lib/api.ts (streamResearch)
+└── docker-compose.yml
 ```
 
 ---
 
 ## How to Run Locally
 
-Backend runs standalone on SQLite; the full stack uses Docker Compose + PostgreSQL.
-
 ```bash
-# Backend (no Docker needed)
+# 1. Env (OpenRouter free — no credits needed)
+cp .env.example .env  # set OPENROUTER_API_KEY=sk-or-v1-... ; TRUSTLEDGER_MODEL=openrouter/free
+
+# 2. Backend (no Docker needed)
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000  # → http://localhost:8000/docs
 
-# Run tests
-cd backend && python -m pytest tests -q
+# 3. Tests
+cd backend && python -m pytest tests -q  # 23 passed
 
-# Frontend
+# 4. Frontend
 cd frontend
 npm install
-npm run dev
+npm run dev  # → http://localhost:3000
 
-# Full stack with PostgreSQL (requires Docker)
-cp .env.example .env   # set POSTGRES_PASSWORD
+# 5. Full stack with PostgreSQL
 docker compose up --build
+
+# 6. Live streaming research
+curl -N -X POST http://localhost:8000/api/v1/research/stream -H "Content-Type: application/json" \
+  -d '{"query":"Should Tata Power enter Rajasthan EV charging in FY27?"}'
 ```
 
-Dashboard: `http://localhost:3000`  
-API docs: `http://localhost:8000/docs`
-
-Seed demo data: `python -m seed.load_demo_data` (coming with the simulated agent, Week 2)
+Query via UI prompt `Ask a research question…` — tokens stream, Kanban card moves live.
 
 ---
 
 ## Current Prototype Limitations
 
-- Backend implemented and tested; simulated agent and seed data still pending (Week 2)
-- Replay and Integrity UI tabs not yet built (Weeks 3–4)
-- No authentication or RBAC
-- Hash chain on standard PostgreSQL, not WORM/HSM storage
-- One domain, one simulated agent, synthetic data
-- No real enterprise system integrations
-- Search is PostgreSQL-only (OpenSearch deferred)
-
-These are intentional. See `docs/08_Scope_and_Non_Goals.md`.
+- No authentication/RBAC (intentional per `08_Scope_and_Non_Goals.md`)
+- Hash chain on standard PostgreSQL, not WORM/HSM
+- Free-model latency via `openrouter/free` (use paid model for production speed)
+- Single org, two agents, synthetic data
+- Search is PostgreSQL `ILIKE` (OpenSearch deferred)
 
 ---
 
 ## Timeline
 
-**Target demo:** second week of September 2026 (~4 weeks).
+**Sep 14 target:** `feat/live-research-openrouter` (PR #22) ships real streaming + graph + board declutter.
 
 | Week | Focus |
 |------|-------|
 | 1 | Product, schema, API, demo story |
-| 2 | Backend, hash chain, simulated agent, seed data |
-| 3 | Dashboard, trail, replay |
-| 4 | Integrity UI, polish, rehearsal |
+| 2 | Backend, hash chain, ResearchAgent, seed (16 records) |
+| 3 | Dashboard, trail, replay, integrity |
+| 4 | Streaming research (OpenRouter), knowledge graph, polish, docs refresh |
 
-The EOI described 12 weeks; this capstone is compressed. Details: `docs/07_Weekly_Roadmap.md`.
+EOI described 12 weeks; capstone compressed to ~4. See `07_Weekly_Roadmap.md`, `10_Current_Status.md`, `13_Review_Coverage_and_Load_Plan.md`, `14_Frontend_Realism_Plan.md`.
 
 ---
 
@@ -191,22 +185,8 @@ The EOI described 12 weeks; this capstone is compressed. Details: `docs/07_Weekl
 
 **One sentence:** TrustLedger creates tamper-evident, business-readable audit records for high-stakes AI agent decisions — so compliance teams can understand, replay, and defend every call in minutes, not days.
 
-Traditional monitoring tells you what happened technically. TrustLedger creates a business-readable record of **why an AI decision can be defended**.
-
 ---
 
 ## Team
 
-Manipal University Jaipur — Diet Coke
-
-- Suryanshi Singh
-- Shivansh Tripathi
-- Yash Mishra
-- Yash Maheswari
-- Yash Khanduri
-
----
-
-## Documents
-
-Start with [`docs/00_Project_Summary.md`](docs/00_Project_Summary.md), then the numbered docs in order.
+Manipal University Jaipur — Diet Coke — Suryanshi Singh, Shivansh Tripathi, Yash Mishra, Yash Maheswari, Yash Khanduri

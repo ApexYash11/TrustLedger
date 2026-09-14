@@ -47,7 +47,7 @@
 | `active` | Agent available to process tasks |
 | `idle` | No tasks currently running (dashboard display only) |
 
-The prototype uses one pre-registered agent: **ResearchAgent v1.2.0**.
+The prototype uses two registered agents: **ResearchAgent v1.3.0** (Deloitte client research, streaming via OpenRouter `openrouter/free`) and **ComplianceBot v1.0.1** (regulatory scans).
 
 ### Task Lifecycle
 
@@ -430,6 +430,18 @@ On tamper:
 
 ---
 
+### Streaming Research (query → tokens → sealed record)
+
+```
+POST /research/stream
+```
+
+Request: `{ "query": "Should Tata Power enter Rajasthan EV charging in FY27?", "agent_domain": "deloitte_client_research" }`
+
+Response: `text/event-stream` SSE — `data: {type:"status", task_id} → data: {type:"token", token}* → data: {type:"done", task_id, outcome}`. Server creates `queued → running` task, streams OpenRouter tokens, appends evidence/policy events, seals hash-chained record. Fallback to template if `OPENROUTER_API_KEY` missing.
+
+See `backend/app/services/llm.py` (model `openrouter/free` by default) and `frontend/src/lib/api.ts:streamResearch`.
+
 ### Verify Full Chain (optional demo endpoint)
 
 ```
@@ -489,16 +501,16 @@ trustledger.complete_decision(
 
 ---
 
-## Simulated Agent (Prototype)
+## Agents (Prototype + Live LLM)
 
-The prototype includes `agents/research_agent.py` — a scripted agent that:
+`agents/research_agent.py` (v1.3.0) — **LLM-first with template fallback**. If `OPENROUTER_API_KEY` is set, it calls OpenRouter (`openrouter/free`, `backend/app/services/llm.py`) to generate `evidence_details`/`policy_details`/rationale; otherwise it returns the deterministic template so tests/offline demos pass. `agents/compliance_bot.py` is the second lane. Both are dispatched via `agents/runtime.py:dispatcher_loop` (0.7s tick, SSE `status_changed`).
 
-1. Reads synthetic research cases from a JSON seed file
-2. Calls TrustLedger API at each step (with realistic delays)
+1. Reads prompt or seed scenario
+2. Streams evidence/policy events (either LLM-grounded or template) with realistic delays
 3. Produces varied outcomes: recommended, recommended_with_caveats, not_recommended, escalated
-4. Triggers partner review for high-value or high-risk engagements
+4. Triggers partner review for high-value/high-risk engagements
 
-**Prototype Design Decision:** LLM API integration is optional. The scripted agent is sufficient for demo reliability. An LLM-powered variant can replace the rationale generation in Week 4 if time permits.
+**Prototype Design Decision (updated Sep 14):** LLM is now the default path via `POST /research/stream`; template fallback keeps demo reliable.
 
 ### Agent script flow (per engagement)
 
