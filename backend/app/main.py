@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import Base, SessionLocal, engine
-from .routes import agents, decisions
+from .routes import agents, decisions, research
 
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     if os.environ.get("TRUSTLEDGER_DISPATCHER", "1") != "0":
         from agents.runtime import dispatcher_loop
 
-        dispatcher_task = asyncio.create_task(dispatcher_loop(SessionLocal, poll_seconds=float(os.environ.get("TRUSTLEDGER_POLL", "2.0"))))
+        dispatcher_task = asyncio.create_task(dispatcher_loop(SessionLocal, poll_seconds=float(os.environ.get("TRUSTLEDGER_POLL", "0.7"))))
 
     yield
 
@@ -39,7 +39,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -52,3 +52,4 @@ def health():
 
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(decisions.router, prefix="/api/v1")
+app.include_router(research.router, prefix="/api/v1")
