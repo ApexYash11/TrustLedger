@@ -2,9 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-white text-stone-800 antialiased;
+/* Self-hosted variable fonts (same faces as the reference design) */
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/fonts/instrument-sans-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-var.woff2") format("woff2");
+}
 
+:root {
+  --bg: #f4f3f1;
+  --surface: #ffffff;
+  --surface-2: #fbfaf9;
+  --border: #eae8e4;
+  --hover: #f1efec;
+  --text: #23211e;
+  --text-2: #57534d;
+  --text-3: #6b6862;
+  --muted: #9a968f;
+  --muted-2: #a8a49c;
+  --faint: #c8c4bc;
+  --ink: #1c1b1a;
+  --ink-fg: #f5f3f0;
+  --card-line: rgba(35, 33, 30, 0.06);
+  --card-shade: rgba(28, 27, 26, 0.08);
+  --card-accent: rgba(28, 27, 26, 0.33);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv02", "cv03";
 }
 
@@ -16,11 +58,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #e0e0dd;
+  background: var(--faint);
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #c9c9c4;
+  background: var(--muted-2);
 }
 
 .card-hover {
@@ -32,9 +74,9 @@ body {
 }
 
 .drag-over {
-  outline: 2px dashed #a3a3a0;
+  outline: 2px dashed var(--muted-2);
   outline-offset: -4px;
-  background: #fafaf9;
+  background: var(--surface-2);
 }
 
 .dragging {
