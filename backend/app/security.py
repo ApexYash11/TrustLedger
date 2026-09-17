@@ -13,6 +13,8 @@ Configuration
 When neither is set, authentication is **disabled** — local development and the
 test suite keep working with zero configuration. Enforced mode is the default
 for any deployed environment: set the keys and every API route requires them.
+A present-but-malformed configuration raises at startup (fail closed); it never
+falls back to open mode.
 
 Production note
 ---------------
@@ -42,16 +44,37 @@ def load_keys() -> dict[str, str]:
         return _keys_cache
     keys: dict[str, str] = {}
     raw = os.environ.get("TRUSTLEDGER_API_KEYS", "")
-    for part in raw.split(","):
-        part = part.strip()
-        m = _KEY_RE.match(part)
-        if m and m.group(2):
-            keys[m.group(1)] = m.group(2)
+    if raw.strip():
+        # A configured-but-unparseable key list must fail LOUD, never fall back
+        # to an empty dict — an empty dict would silently disable auth while
+        # the operator believes it is on (review finding P1).
+        for part in raw.split(","):
+            part = part.strip()
+            m = _KEY_RE.match(part)
+            if m and m.group(2):
+                keys[m.group(1)] = m.group(2)
+            else:
+                raise RuntimeError(
+                    "TRUSTLEDGER_API_KEYS contains a malformed entry "
+                    f"({part!r}; expected 'principal:key', comma-separated). "
+                    "Fix the configuration, or unset the variable entirely to "
+                    "run in open development mode."
+                )
     single = os.environ.get("TRUSTLEDGER_API_KEY", "").strip()
     if single:
         keys.setdefault("api", single)
     _keys_cache = keys
     return keys
+
+
+def validate_auth_config() -> None:
+    """Check the auth configuration at startup (fail closed).
+
+    Open development mode applies only when no key configuration is present at
+    all. A present-but-invalid configuration raises here so the app refuses to
+    boot insecure rather than running with auth silently off.
+    """
+    load_keys()  # raises RuntimeError on malformed non-empty config
 
 
 def auth_enabled() -> bool:
@@ -93,14 +116,17 @@ def _forbidden(message: str, code: str) -> JSONResponse:
 async def auth_middleware(request: Request, call_next):
     """Attribute every API request to a principal; refuse anonymous callers.
 
-    Registered AFTER the CORS middleware so preflight OPTIONS requests are
-    answered before authentication runs.
+    CORS is registered OUTSIDE this middleware (see main.py), so preflight
+    OPTIONS requests are answered before authentication runs, and auth's own
+    401/403 responses pass back through CORS with the right headers.
     """
     path = request.url.path
-    # CORS preflight: browsers send an OPTIONS probe before any request with an
-    # Authorization header. It carries no key and touches no data, so it must
-    # pass straight through to the CORS middleware — auth runs outside CORS, so
-    # rejecting it here kills every browser request before it starts.
+    # CORS is registered OUTSIDE auth (see main.py), so the CORS middleware
+    # answers preflight OPTIONS before auth ever runs, and — critically —
+    # auth's own 401/403 responses pass back through CORS and carry the
+    # Access-Control-Allow-Origin header, so browsers surface the real auth
+    # error instead of a generic network failure (review finding P2). The
+    # OPTIONS skip here is a belt-and-braces backstop for the preflight path.
     if request.method == "OPTIONS" or not auth_enabled() or path in PUBLIC_PATHS or not path.startswith("/api/"):
         return await call_next(request)
 

@@ -130,6 +130,60 @@ def test_status_patch_recorded_under_principal(enforced, auth_agent_id):
     assert moves and all(m["actor"] == "compliance-analyst" for m in moves)
 
 
+def test_malformed_config_fails_closed():
+    """Review P1: a non-empty but malformed key list must raise, never fall
+    back to silently-disabled auth."""
+    os.environ["TRUSTLEDGER_API_KEYS"] = "garbage-without-colon, another"
+    security._keys_cache = None
+    try:
+        with pytest.raises(RuntimeError):
+            security.load_keys()
+        with pytest.raises(RuntimeError):
+            security.validate_auth_config()
+    finally:
+        os.environ.pop("TRUSTLEDGER_API_KEYS", None)
+        security._keys_cache = None
+
+
+def test_blank_config_is_explicit_open_mode():
+    """Review P1: open dev mode is reserved for ABSENT configuration."""
+    os.environ["TRUSTLEDGER_API_KEYS"] = ""
+    security._keys_cache = None
+    try:
+        assert security.load_keys() == {}
+        assert security.auth_enabled() is False
+    finally:
+        os.environ.pop("TRUSTLEDGER_API_KEYS", None)
+        security._keys_cache = None
+
+
+def test_auth_failures_carry_cors_headers(enforced):
+    """Review P2: 401/403 from auth must include Access-Control-Allow-Origin
+    so the browser surfaces the real error, not a generic network failure."""
+    origin = {"Origin": "http://localhost:3000"}
+    no_key = client.get("/api/v1/decisions", headers=origin)
+    assert no_key.status_code == 401
+    assert no_key.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+    bad = client.get("/api/v1/decisions", headers={**origin, "Authorization": "Bearer wrong"})
+    assert bad.status_code == 403
+    assert bad.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_preflight_still_passes(enforced):
+    """The CORS-outermost reorder must not regress the browser preflight path."""
+    resp = client.options(
+        "/api/v1/decisions",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
 # --- redaction -------------------------------------------------------------
 
 
@@ -148,6 +202,26 @@ def test_redact_inputs_copies_and_preserves_structure():
     assert out["research_question"] == "email [REDACTED]"
     assert out["nested"] == ["keep", 42]  # non-strings untouched
     assert inputs["research_question"] == "email dev@corp.com"  # no mutation
+
+
+def test_redact_nested_containers():
+    """Review P2: strings inside nested dicts and lists must be redacted too."""
+    inputs = {
+        "research_question": "plain question",
+        "context": {
+            "contact": "nested@example.com",
+            "history": ["spoke to +91-90000 00000", {"email": "deep@example.com"}],
+            "count": 7,
+        },
+    }
+    out = redact_inputs(inputs)
+    assert out["context"]["contact"] == "[REDACTED]"
+    assert out["context"]["history"][0] == "spoke to [REDACTED]"
+    assert out["context"]["history"][1]["email"] == "[REDACTED]"
+    assert out["context"]["count"] == 7  # non-strings preserved
+    # Original input untouched (no mutation).
+    assert inputs["context"]["contact"] == "nested@example.com"
+    assert inputs["context"]["history"][0] == "spoke to +91-90000 00000"
 
 
 def test_auth_off_when_unset(open_mode, agent_id):

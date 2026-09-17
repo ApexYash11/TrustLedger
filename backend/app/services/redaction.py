@@ -36,9 +36,21 @@ def redact_pii(text: str) -> str:
     return out
 
 
+def redact_value(value):
+    """Recursively redact strings inside JSON-shaped values (dicts and lists).
+
+    Returns new containers — the original input is never mutated (review
+    finding P2: inputs may be nested, and only top-level strings were covered).
+    """
+    if isinstance(value, str):
+        return redact_pii(value)
+    if isinstance(value, dict):
+        return {k: redact_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_value(v) for v in value]
+    return value
+
+
 def redact_inputs(inputs: dict) -> dict:
-    """Redact every string value in a task's inputs dict (shallow copy)."""
-    cleaned: dict = {}
-    for key, value in inputs.items():
-        cleaned[key] = redact_pii(value) if isinstance(value, str) else value
-    return cleaned
+    """Redact every string in a task's inputs, at any nesting depth."""
+    return {key: redact_value(value) for key, value in inputs.items()}
