@@ -17,3 +17,6 @@ dev_server*.log
 backend/uvicorn*.log
 frontend/dev_server*.log
 
+# OS / build noise
+.DS_Store
+*.tsbuildinfo

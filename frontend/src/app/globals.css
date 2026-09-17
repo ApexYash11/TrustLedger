@@ -36,6 +36,31 @@
   --card-line: rgba(35, 33, 30, 0.06);
   --card-shade: rgba(28, 27, 26, 0.08);
   --card-accent: rgba(28, 27, 26, 0.33);
+
+  /* Semantic palette. These are the Kanban lane colours promoted to real
+     tokens, so a colour means the same thing everywhere it appears: green is
+     settled and verified, blue is waiting on a person, amber is in motion or
+     qualified, red is refused or broken, slate is inert. Each has a tinted
+     ground and a line colour for chips. Tuned for AA contrast on --surface. */
+  --ok: #227a46;
+  --ok-soft: #e8f3ec;
+  --ok-line: #b5dbc4;
+
+  --info: #2b5fb8;
+  --info-soft: #e9eefb;
+  --info-line: #bed1f1;
+
+  --warn: #96600f;
+  --warn-soft: #faf0dc;
+  --warn-line: #e8d2a4;
+
+  --danger: #a83a29;
+  --danger-soft: #fbeae7;
+  --danger-line: #f1c5bc;
+
+  --neutral: #6c7886;
+  --neutral-soft: #eef1f4;
+  --neutral-line: #d4dbe2;
 }
 
 html {

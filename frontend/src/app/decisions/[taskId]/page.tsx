@@ -6,22 +6,14 @@ import DecisionGraph from "@/components/DecisionGraph";
 import DecisionTimeline from "@/components/DecisionTimeline";
 import IntegrityPanel from "@/components/IntegrityPanel";
 import ReplayViewer from "@/components/ReplayViewer";
-import { api, FullDecisionRecord } from "@/lib/api";
+import Chip, { RiskIcon } from "@/components/Chip";
+import { api, ApiError, API_URL, FullDecisionRecord } from "@/lib/api";
 import { formatTimestamp, humanize } from "@/lib/format";
+import { OUTCOME, REVIEW, RISK, STATUS, TAB_PURPOSE, lookup, toneColor } from "@/lib/vocab";
 
 const clean = (s: string) => s.replace(/—/g, "-").replace(/–/g, "-");
+const API_BASE = API_URL;
 
-const RISK: Record<string, string> = {
-  low: "border-border bg-surface-2 text-text-2",
-  medium: "border-muted bg-surface-2 text-text",
-  high: "border-ink bg-ink text-ink-fg",
-};
-const OUTCOME_ICON: Record<string, string> = {
-  recommended: "✓",
-  recommended_with_caveats: "◐",
-  not_recommended: "✕",
-  escalated: "↑",
-};
 
 const TABS = ["Summary", "Decision Trail", "Replay", "Integrity"] as const;
 type Tab = (typeof TABS)[number];
@@ -40,7 +32,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function Summary({ record }: { record: FullDecisionRecord }) {
   const task = record.task as TaskData;
   const decision = record.decision as DecisionData | null;
-  const inputs = Object.entries(task.inputs ?? {});
+  const outcomeEntry = lookup(OUTCOME, decision?.outcome);
   const conf = decision?.confidence_score != null ? Math.round(decision.confidence_score * 100) : null;
 
   return (
@@ -52,12 +44,20 @@ function Summary({ record }: { record: FullDecisionRecord }) {
           {decision ? (
             <>
               <div className="mt-2 flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white font-bold text-ink">
-                  {OUTCOME_ICON[decision.outcome ?? ""] ?? "•"}
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px] font-bold"
+                  style={{ background: outcomeEntry ? toneColor(outcomeEntry.tone) : "#fff", color: "#fff" }}
+                >
+                  {outcomeEntry?.icon ?? "•"}
                 </span>
                 <div>
-                  <h3 className="text-xl font-semibold leading-tight">{humanize(decision.outcome)}</h3>
+                  <h3 className="text-xl font-semibold leading-tight">
+                    {outcomeEntry?.label ?? humanize(decision.outcome)}
+                  </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-[rgba(245,243,240,.75)]">{decision.outcome_summary}</p>
+                  {outcomeEntry && (
+                    <p className="mt-1.5 text-[12.5px] text-[rgba(245,243,240,.5)]">{outcomeEntry.meaning}</p>
+                  )}
                 </div>
               </div>
               {decision.structured_rationale?.primary_reason && (
@@ -88,8 +88,6 @@ function Summary({ record }: { record: FullDecisionRecord }) {
           <span className="font-medium text-ink-fg">{decision?.decided_at ? formatTimestamp(decision.decided_at) : "—"}</span>
         </div>
       </div>
-
-      <DecisionGraph record={record} />
 
       <Card title="What was asked">
         {(() => {
@@ -126,36 +124,60 @@ function Summary({ record }: { record: FullDecisionRecord }) {
         </Card>
       )}
 
+      <DecisionGraph record={record} />
+
+      {/* The graph shows how the facts relate; SVG can only fit truncated
+          titles, so the full text lives here directly beneath it. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card title={`Evidence · ${record.evidence.length}`}>
+        <Card title={`Sources · ${record.evidence.length}`}>
           {record.evidence.length ? (
-            <ul className="mt-3 space-y-3 text-sm">
+            <ul className="mt-3 space-y-2.5 text-sm">
               {record.evidence.map((it) => (
-                <li key={it.evidence_id} className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-                  <p className="font-medium text-text">{it.title}</p>
-                  <p className="mt-1 text-xs text-muted">{it.source} · {it.evidence_type.replace(/_/g, " ")}</p>
-                  <p className="mt-1.5 text-text-2 leading-relaxed">{it.content_summary}</p>
+                <li
+                  key={it.evidence_id}
+                  className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
+                  style={{ borderLeft: "3px solid var(--info)" }}
+                >
+                  <p className="font-medium leading-snug text-text">{it.title}</p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {it.source} · {it.evidence_type.replace(/_/g, " ")}
+                  </p>
+                  {it.content_summary && (
+                    <p className="mt-1.5 leading-relaxed text-text-2">{it.content_summary}</p>
+                  )}
+                  {it.relevance && <p className="mt-1.5 text-xs font-medium text-text-2">{it.relevance}</p>}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-sm text-muted">No evidence cited.</p>
+            <p className="mt-3 text-sm text-muted">No sources were cited for this decision.</p>
           )}
         </Card>
-        <Card title={`Methodology · ${record.policy_references.length}`}>
+        <Card title={`Standards applied · ${record.policy_references.length}`}>
           {record.policy_references.length ? (
-            <ul className="mt-3 space-y-3 text-sm">
+            <ul className="mt-3 space-y-2.5 text-sm">
               {record.policy_references.map((it) => (
-                <li key={it.policy_id} className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-                  <p className="font-medium text-text">§ {it.section} · {it.title}</p>
-                  <p className="text-xs text-muted">{it.policy_code}</p>
-                  <p className="mt-1.5 text-text-2 italic">&ldquo;{it.text_excerpt}&rdquo;</p>
-                  <p className="mt-1.5 text-xs font-medium text-ink">Applied: {it.application}</p>
+                <li
+                  key={it.policy_id}
+                  className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
+                  style={{ borderLeft: "3px solid var(--warn)" }}
+                >
+                  <p className="font-medium leading-snug text-text">
+                    {it.section ? `§ ${it.section} · ` : ""}
+                    {it.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">{it.policy_code}</p>
+                  {it.text_excerpt && (
+                    <p className="mt-1.5 italic leading-relaxed text-text-2">&ldquo;{it.text_excerpt}&rdquo;</p>
+                  )}
+                  {it.application && (
+                    <p className="mt-1.5 text-xs font-medium text-text-2">Applied: {it.application}</p>
+                  )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-sm text-muted">No methodology cited.</p>
+            <p className="mt-3 text-sm text-muted">No methodology clauses were cited.</p>
           )}
         </Card>
       </div>
@@ -196,7 +218,15 @@ export default function DecisionDetailPage() {
     if (!taskId) return;
     setRecord(null);
     setError(null);
-    api.getDecision(taskId).then(setRecord).catch(() => setError("Unable to load this decision."));
+    api
+      .getDecision(taskId)
+      .then(setRecord)
+      .catch((err: unknown) =>
+        // A 404 means the record is genuinely gone (deleted, or the database was
+        // reseeded). Anything else is a connection or server problem, and the
+        // two need different advice.
+        setError(err instanceof ApiError && err.status === 404 ? "missing" : "unreachable"),
+      );
   }, [taskId]);
 
   const select = (t: Tab) => {
@@ -206,18 +236,69 @@ export default function DecisionDetailPage() {
 
   if (error)
     return (
-      <div className="flex h-dvh overflow-hidden bg-bg text-text">
-        <main className="flex-1 p-8 text-sm text-text-2">{error}</main>
+      <div className="flex h-dvh flex-col items-center justify-center gap-5 bg-bg px-6 text-center text-text">
+        <span className="flex size-12 items-center justify-center rounded-full border border-border bg-surface text-muted">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7.5v5M12 16.2v.3" />
+          </svg>
+        </span>
+        <div className="max-w-md">
+          <h1 className="text-lg font-semibold tracking-tight">
+            {error === "missing" ? "This decision record no longer exists" : "Can’t reach the ledger"}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-text-2">
+            {error === "missing" ? (
+              <>
+                Nothing is stored under this ID. It was either deleted before being sealed, or the
+                database was reseeded after the link was created.
+              </>
+            ) : (
+              <>
+                The API at <code className="font-mono text-[13px]">{API_BASE}</code> did not respond.
+                Check that the backend is running, then try again.
+              </>
+            )}
+          </p>
+          <p className="mt-3 font-mono text-[11px] text-muted">{taskId}</p>
+        </div>
+        <div className="flex gap-2.5">
+          <a
+            href="/"
+            className="rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-fg no-underline hover:brightness-95"
+          >
+            Back to board
+          </a>
+          {error === "unreachable" && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="cursor-pointer rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-medium text-text-2 hover:bg-hover"
+            >
+              Try again
+            </button>
+          )}
+        </div>
       </div>
     );
   if (!record)
     return (
-      <div className="flex h-dvh overflow-hidden bg-bg text-text">
-        <main className="flex-1 p-8 text-sm text-muted">Loading decision…</main>
+      <div className="flex h-dvh items-center justify-center bg-bg">
+        <p className="flex items-center gap-2.5 text-sm text-muted">
+          <span className="size-2 animate-pulse rounded-full bg-muted-2" />
+          Loading decision record…
+        </p>
       </div>
     );
 
   const task = record.task as TaskData;
+  // Headline the question, not the identifier. case_id used to BE the question
+  // truncated to 75 chars, which is why long questions appeared cut off.
+  const rawQ = task.inputs?.research_question ?? task.inputs?.prompt;
+  const headline = typeof rawQ === "string" && rawQ.trim() ? rawQ.trim() : (task.case_id ?? taskId ?? "Research task");
+  const statusEntry = lookup(STATUS, task.status);
+  const riskEntry = lookup(RISK, task.risk_level);
+  const reviewEntry = lookup(REVIEW, task.human_review_status);
   return (
     <div className="flex h-dvh overflow-hidden bg-bg text-text">
       <main className="flex-1 overflow-y-auto">
@@ -245,24 +326,32 @@ export default function DecisionDetailPage() {
             </a>
           </div>
           <div className="mt-3 rounded-[14px] border border-border bg-surface px-6 py-5 shadow-card">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Decision record · tamper-evident</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-text">{task.case_id ?? taskId}</h1>
+            <p className="font-mono text-[11.5px] text-muted">{task.case_id ?? taskId}</p>
+            <h1 className="mt-1 text-2xl font-bold leading-tight tracking-tight text-text">
+              {headline}
+            </h1>
             <p className="mt-1 text-sm text-text-2">{task.case_type ? clean(task.case_type) : "Research task"}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {task.status && (
-                <span className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs font-medium text-text-2">
-                  {humanize(task.status)}
-                </span>
+            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
+              A permanent record of one AI research decision — what was asked, what it was based on,
+              and proof it has not been altered since.
+            </p>
+            <div className="mt-3.5 flex flex-wrap gap-2">
+              {statusEntry && (
+                <Chip hint="Status" label={statusEntry.label} tone={statusEntry.tone} title={statusEntry.meaning} />
               )}
-              {task.risk_level && (
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${RISK[task.risk_level] ?? "border-border bg-surface-2 text-text-2"}`}>
-                  {task.risk_level}
-                </span>
+              {riskEntry && (
+                <Chip label={riskEntry.label} tone={riskEntry.tone} title={riskEntry.meaning} icon={<RiskIcon size={12} />} />
               )}
-              {task.human_review_status && (
-                <span className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs font-medium text-text-2">
-                  {humanize(task.human_review_status)}
-                </span>
+              {reviewEntry && (
+                <Chip hint="Human" label={reviewEntry.label} tone={reviewEntry.tone} title={reviewEntry.meaning} />
+              )}
+              {record.audit_record && (
+                <Chip
+                  label={`Sealed · chain #${record.audit_record.chain_sequence}`}
+                  tone="ok"
+                  dot={false}
+                  title="This record is on the hash chain. It can no longer be edited or deleted."
+                />
               )}
             </div>
           </div>
@@ -282,6 +371,9 @@ export default function DecisionDetailPage() {
               </button>
             ))}
           </div>
+          {/* Say what the selected tab is for — nobody should have to click all
+              four to work out which one answers their question. */}
+          <p className="mt-2.5 text-[13px] text-muted">{TAB_PURPOSE[tab]}</p>
 
           <div className="py-6" role="tabpanel">
             {tab === "Summary" && <Summary record={record} />}

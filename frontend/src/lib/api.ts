@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 /** Custom error that preserves the HTTP status code for callers to inspect. */
 export class ApiError extends Error {
@@ -24,6 +24,10 @@ export interface TaskSummary {
   duration_seconds: number | null;
   human_review_status: string | null;
   created_at: string;
+  /** The question this task answers; the board headlines it over case_id. */
+  research_question: string | null;
+  /** True once the record is on the hash chain — every mutation is refused. */
+  sealed: boolean;
 }
 
 export interface DecisionListResponse {

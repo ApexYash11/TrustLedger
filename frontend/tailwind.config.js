@@ -25,6 +25,11 @@ module.exports = {
           2: "var(--muted-2)",
         },
         faint: "var(--faint)",
+        ok: { DEFAULT: "var(--ok)", soft: "var(--ok-soft)", line: "var(--ok-line)" },
+        info: { DEFAULT: "var(--info)", soft: "var(--info-soft)", line: "var(--info-line)" },
+        warn: { DEFAULT: "var(--warn)", soft: "var(--warn-soft)", line: "var(--warn-line)" },
+        danger: { DEFAULT: "var(--danger)", soft: "var(--danger-soft)", line: "var(--danger-line)" },
+        neutral: { DEFAULT: "var(--neutral)", soft: "var(--neutral-soft)", line: "var(--neutral-line)" },
       },
       fontFamily: {
         sans: ['"Instrument Sans"', "-apple-system", "BlinkMacSystemFont", "sans-serif"],
