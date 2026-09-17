@@ -47,7 +47,7 @@
 | `active` | Agent available to process tasks |
 | `idle` | No tasks currently running (dashboard display only) |
 
-The prototype uses two registered agents: **ResearchAgent v1.3.0** (Deloitte client research, streaming via OpenRouter `openrouter/free`) and **ComplianceBot v1.0.1** (regulatory scans).
+The prototype uses two registered agents: **ResearchAgent v1.3.0** (Deloitte client research, streaming via OpenRouter (`TRUSTLEDGER_MODEL`, default `openai/gpt-4o-mini`)) and **ComplianceBot v1.0.1** (regulatory scans).
 
 ### Task Lifecycle
 
@@ -440,7 +440,7 @@ Request: `{ "query": "Should Tata Power enter Rajasthan EV charging in FY27?", "
 
 Response: `text/event-stream` SSE — `data: {type:"status", task_id} → data: {type:"token", token}* → data: {type:"done", task_id, outcome}`. Server creates `queued → running` task, streams OpenRouter tokens, appends evidence/policy events, seals hash-chained record. Fallback to template if `OPENROUTER_API_KEY` missing.
 
-See `backend/app/services/llm.py` (model `openrouter/free` by default) and `frontend/src/lib/api.ts:streamResearch`.
+See `backend/app/services/llm.py` (model from `TRUSTLEDGER_MODEL`, default `openai/gpt-4o-mini`) and `frontend/src/lib/api.ts:streamResearch`.
 
 ### Verify Full Chain (optional demo endpoint)
 
@@ -503,7 +503,7 @@ trustledger.complete_decision(
 
 ## Agents (Prototype + Live LLM)
 
-`agents/research_agent.py` (v1.3.0) — **LLM-first with template fallback**. If `OPENROUTER_API_KEY` is set, it calls OpenRouter (`openrouter/free`, `backend/app/services/llm.py`) to generate `evidence_details`/`policy_details`/rationale; otherwise it returns the deterministic template so tests/offline demos pass. `agents/compliance_bot.py` is the second lane. Both are dispatched via `agents/runtime.py:dispatcher_loop` (0.7s tick, SSE `status_changed`).
+`agents/research_agent.py` (v1.3.0) — **LLM-first with template fallback**. If `OPENROUTER_API_KEY` is set, it calls OpenRouter (`TRUSTLEDGER_MODEL`, `backend/app/services/llm.py`) to generate `evidence_details`/`policy_details`/rationale; otherwise it returns the deterministic template so tests/offline demos pass. `agents/compliance_bot.py` is the second lane. Both are dispatched via `agents/runtime.py:dispatcher_loop` (0.7s tick, SSE `status_changed`).
 
 1. Reads prompt or seed scenario
 2. Streams evidence/policy events (either LLM-grounded or template) with realistic delays

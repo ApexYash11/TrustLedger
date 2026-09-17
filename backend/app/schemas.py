@@ -157,6 +157,13 @@ class TaskSummary(BaseModel):
     duration_seconds: Optional[float] = None
     human_review_status: Optional[str] = None
     created_at: str
+    #: The question this task answers. The board headlines this rather than
+    #: ``case_id``, which is only an identifier.
+    research_question: Optional[str] = None
+    #: True once the task has an AuditRecord on the hash chain. Sealed tasks
+    #: reject every mutation (status PATCH, delete), so the board uses this to
+    #: stop offering actions the API is guaranteed to refuse.
+    sealed: bool = False
 
 
 class DecisionList(BaseModel):

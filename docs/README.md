@@ -40,16 +40,16 @@ A standardized **decision record** is created live, containing:
 - Evidence retrieved during the decision (typed `evidence` nodes)
 - Policy clauses applied (typed `policy_reference` nodes)
 - Structured rationale (never raw model chain-of-thought)
-- Chronological decision events + knowledge-graph edges (`supports` / `applies_to` / `validates`)
+- Chronological decision events + evidence/standard links (`supports` / `applies_to`) — see `docs/12` for what is and is not built
 - Tamper-evident SHA-256 hash chain
 
-The same core schema works across industries; only the methodology/standard references change. The prototype demonstrates this on **Deloitte client research** with streaming research via `POST /api/v1/research/stream` and a visual knowledge graph (`DecisionGraph`).
+The same core schema works across industries; only the methodology/standard references change. The prototype demonstrates this on **Deloitte client research** with streaming research via `POST /api/v1/research/stream` and a visual evidence graph (`DecisionGraph`).
 
 ---
 
 ## How It Works
 
-1. Query enters via `POST /api/v1/research/stream` (`{query, agent_domain}`) — or via `POST /decisions/queue` for dispatcher mode. The `ResearchAgent` calls OpenRouter (`openrouter/free` router, free) or falls back to template if no key.
+1. Query enters via `POST /api/v1/research/stream` (`{query, agent_domain}`) — or via `POST /decisions/queue` for dispatcher mode. The `ResearchAgent` calls OpenRouter (`TRUSTLEDGER_MODEL`, default `openai/gpt-4o-mini`) or falls back to the template if no key is set.
 2. TrustLedger streams tokens (`data: {type:"token"}`) while appending linked evidence/policy events, then seals the record with a SHA-256 hash chained to the previous record.
 3. A compliance officer opens the **Research Command Center** (minimal Kanban), clicks a task, inspects the **Knowledge Graph** (client → question → evidence/policy → recommendation), walks the **Decision Trail**, **Replays** steps, and **Verifies** chain integrity.
 4. `GET /decisions/{id}/verify` and `GET /decisions/chain/verify` prove no post-seal tampering (tampered `RES-2026-009999` demonstrates failure).
@@ -65,7 +65,7 @@ Browser (Next.js dashboard — Kanban + DecisionGraph + Timeline/Replay/Integrit
         │
         ▼
 FastAPI (logging, research stream, replay, verification)
-        │  ├─ OpenRouter LLM service (app/services/llm.py — openrouter/free)
+        │  ├─ OpenRouter LLM service (app/services/llm.py — TRUSTLEDGER_MODEL)
         │  └─ Hash Chain Engine (SHA-256) + Replay Engine
         │
         ▼
@@ -98,7 +98,7 @@ Full script: `docs/06_Demo_Showcase_Flow.md`
 |-------|--------|
 | Frontend | Next.js 14, React, TypeScript, Tailwind — `DecisionGraph`, `DecisionTimeline`, `ReplayViewer`, `IntegrityPanel` |
 | Backend | FastAPI (Python) — logging, research SSE, replay, verify |
-| LLM | OpenRouter (`openrouter/free` router, `app/services/llm.py`); `TRUSTLEDGER_MODEL` env |
+| LLM | OpenRouter (`app/services/llm.py`); model from `TRUSTLEDGER_MODEL`, default `openai/gpt-4o-mini` |
 | Database | PostgreSQL (JSONB) / SQLite fallback |
 | Integrity | SHA-256 hash chaining with `GENESIS` seed |
 | Agent | `ResearchAgent` v1.3.0 (`deloitte_client_research`) + `ComplianceBot`, dispatcher 0.7s, SSE live |
@@ -129,7 +129,7 @@ TrustLedger/
 
 ```bash
 # 1. Env (OpenRouter free — no credits needed)
-cp .env.example .env  # set OPENROUTER_API_KEY=sk-or-v1-... ; TRUSTLEDGER_MODEL=openrouter/free
+cp .env.example .env  # set OPENROUTER_API_KEY=... ; TRUSTLEDGER_MODEL=openai/gpt-4o-mini
 
 # 2. Backend (no Docker needed)
 cd backend
@@ -160,7 +160,7 @@ Query via UI prompt `Ask a research question…` — tokens stream, Kanban card 
 
 - No authentication/RBAC (intentional per `08_Scope_and_Non_Goals.md`)
 - Hash chain on standard PostgreSQL, not WORM/HSM
-- Free-model latency via `openrouter/free` (use paid model for production speed)
+- `openrouter/free` is a router that picks a different model per request; pin `TRUSTLEDGER_MODEL` for predictable output
 - Single org, two agents, synthetic data
 - Search is PostgreSQL `ILIKE` (OpenSearch deferred)
 
@@ -175,7 +175,7 @@ Query via UI prompt `Ask a research question…` — tokens stream, Kanban card 
 | 1 | Product, schema, API, demo story |
 | 2 | Backend, hash chain, ResearchAgent, seed (16 records) |
 | 3 | Dashboard, trail, replay, integrity |
-| 4 | Streaming research (OpenRouter), knowledge graph, polish, docs refresh |
+| 4 | Streaming research (OpenRouter), evidence graph, polish, docs refresh |
 
 EOI described 12 weeks; capstone compressed to ~4. See `07_Weekly_Roadmap.md`, `10_Current_Status.md`, `13_Review_Coverage_and_Load_Plan.md`, `14_Frontend_Realism_Plan.md`.
 

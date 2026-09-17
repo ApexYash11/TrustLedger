@@ -63,7 +63,7 @@ FastAPI serves:
 
 | Factor | Decision |
 |--------|----------|
-| Primary | `ResearchAgent` v1.3.0 calling OpenRouter (`openrouter/free` router, free) via `app/services/llm.py`, streaming via `POST /research/stream` — `ComplianceBot` second lane |
+| Primary | `ResearchAgent` v1.3.0 calling OpenRouter via `app/services/llm.py` (`TRUSTLEDGER_MODEL`, default `openai/gpt-4o-mini`), streaming via `POST /research/stream` — `ComplianceBot` second lane |
 | Fallback | Template `build_steps()` + hard-coded outcomes when `OPENROUTER_API_KEY` missing (tests/offline) |
 | Why hybrid | Real model for demo realism; template keeps CI and rate-limit resilience |
 
@@ -105,7 +105,7 @@ flowchart TB
     subgraph Backend["Backend (FastAPI)"]
         API["Logging & Query API"]
         StreamAPI["Research Stream API<br/>(POST /research/stream SSE)"]
-        LLM["OpenRouter LLM<br/>(openrouter/free)"]
+        LLM["OpenRouter LLM<br/>(TRUSTLEDGER_MODEL)"]
         HashEngine["Hash Chain Engine"]
         ReplayEngine["Replay Engine"]
     end

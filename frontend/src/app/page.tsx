@@ -3,19 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, AgentOut, DecisionListResponse, TaskSummary } from "@/lib/api";
 import TaskCard from "@/components/TaskCard";
+import { STATUS, lookup, toneColor } from "@/lib/vocab";
+import StreamProgress from "@/components/StreamProgress";
 
 const COLUMNS = ["queued", "running", "review_required", "completed"] as const;
+/** Lanes a card can only enter by being sealed — never by a manual status move. */
+const TERMINAL_STATUSES = new Set<string>(["completed", "review_required"]);
 const COLUMN_LABELS: Record<string, string> = {
   queued: "Queued",
   running: "Running",
   review_required: "Review Ready",
   completed: "Completed",
 };
-const COLUMN_DOT: Record<string, string> = {
-  queued: "#8b96a4",
-  running: "#b06f14",
-  review_required: "#2c6bd1",
-  completed: "#2f8f4e",
+/** One line under each lane heading, so the board explains its own workflow. */
+const COLUMN_PURPOSE: Record<string, string> = {
+  queued: "Waiting for an agent",
+  running: "Agent is working",
+  review_required: "Sealed · needs a person",
+  completed: "Sealed · done",
 };
 
 const AGENT_CHOICES = [
@@ -71,6 +76,7 @@ export default function DashboardPage() {
   const [streamCaseId, setStreamCaseId] = useState<string | null>(null);
   const [streamDone, setStreamDone] = useState(false);
   const [streamMinimized, setStreamMinimized] = useState(false);
+  const [streamShowRaw, setStreamShowRaw] = useState(false);
   const [promptInput, setPromptInput] = useState("");
   const [promptRunning, setPromptRunning] = useState(false);
   // Board filters (client-side only)
@@ -422,23 +428,21 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-            <div
-              ref={streamRef}
-              className="min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap break-words text-text-2"
-            >
-              {streamTokens ? (
-                streamTokens
-              ) : (
-                <span className="text-muted">{promptRunning ? "Agent is thinking… tokens will stream here." : "No output yet — run a prompt above."}</span>
-              )}
-              {promptRunning && <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-ink align-middle" />}
+            <div ref={streamRef} className="min-h-0 flex-1 overflow-auto px-4 py-3">
+              <StreamProgress raw={streamTokens} running={promptRunning} showRaw={streamShowRaw} />
             </div>
             <div className="flex shrink-0 items-center justify-between border-t border-border bg-surface-2 px-4 py-2 text-[11px] text-muted-2">
-              <span>
-                {streamTokens.length
-                  ? `${streamTokens.length} chars streamed`
-                  : "Live TrustLedger audit record is being written as tokens arrive"}
-              </span>
+              {streamTokens.length ? (
+                <button
+                  type="button"
+                  onClick={() => setStreamShowRaw((v) => !v)}
+                  className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-muted-2 underline underline-offset-2 hover:text-text-2"
+                >
+                  {streamShowRaw ? "Show progress" : `Show raw output · ${streamTokens.length} chars`}
+                </button>
+              ) : (
+                <span>The audit record is written as the agent works</span>
+              )}
               {streamDone && streamTaskId && <span className="font-medium text-ink">Sealed + hash-chained ✓</span>}
             </div>
           </div>
@@ -485,11 +489,17 @@ export default function DashboardPage() {
                   key={col}
                   id={`col-${col}`}
                   onDragOver={(e) => {
+                    // Terminal lanes are reachable only via a sealed decision
+                    // record, so refuse the drop instead of bouncing it back.
+                    if (TERMINAL_STATUSES.has(col)) return;
                     e.preventDefault();
                     setDragOverCol(col);
                   }}
                   onDragLeave={() => setDragOverCol((c) => (c === col ? null : c))}
-                  onDrop={() => onDrop(col)}
+                  onDrop={() => {
+                    if (TERMINAL_STATUSES.has(col)) return;
+                    onDrop(col);
+                  }}
                   className="flex h-full w-[262px] min-w-[262px] flex-1 flex-col rounded-[14px] px-1.5 pt-3 pb-1 transition-[background,border-color] duration-[120ms] max-md:w-[86vw] max-md:snap-start"
                   style={{
                     background: "transparent",
@@ -497,11 +507,12 @@ export default function DashboardPage() {
                   }}
                 >
                   <div className="flex items-center gap-2 px-1.5 pt-0.5 pb-3">
-                    <span className="size-[9px] shrink-0 rounded-full" style={{ background: COLUMN_DOT[col] }} />
+                    <span className="size-[9px] shrink-0 rounded-full" style={{ background: toneColor(lookup(STATUS, col)?.tone ?? "neutral") }} />
                     <span className="text-[13px] font-semibold tracking-[.3px] text-text-2 uppercase">
                       {COLUMN_LABELS[col]}
                     </span>
                     <span className="font-mono text-[11.5px] text-muted-2">{cards.length}</span>
+                    <span className="truncate text-[11.5px] font-normal normal-case text-muted">{COLUMN_PURPOSE[col]}</span>
                     <button
                       type="button"
                       title="Add to stage"
@@ -520,8 +531,9 @@ export default function DashboardPage() {
                     {cards.map((card) => (
                       <div
                         key={card.task_id}
-                        draggable
+                        draggable={!card.sealed}
                         onDragStart={() => {
+                          if (card.sealed) return;
                           setDragId(card.task_id);
                           isDraggingRef.current = true;
                         }}
