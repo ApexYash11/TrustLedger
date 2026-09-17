@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -85,7 +85,7 @@ def delete_decision(task_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{task_id}/status", response_model=StatusUpdated)
-def update_task_status(task_id: str, payload: StatusUpdate, db: Session = Depends(get_db)):
+def update_task_status(task_id: str, payload: StatusUpdate, request: Request, db: Session = Depends(get_db)):
     task = _get_task_or_404(db, task_id)
     if _is_sealed(db, task_id):
         raise HTTPException(
@@ -110,6 +110,16 @@ def update_task_status(task_id: str, payload: StatusUpdate, db: Session = Depend
         )
 
     task.status = payload.status
+    # Who moved this card? Record it in the trail under the authenticated
+    # principal, so a manual status change is itself audited.
+    actor = getattr(request.state, "principal", "system")
+    decision_ops.append_event(
+        db,
+        task_id=task_id,
+        event_type="status_changed",
+        summary=f"Status manually changed to '{payload.status}'",
+        actor=actor,
+    )
     db.commit()
     decision_ops.emit_task_status(task.task_id, task.case_id, task.status)
     return StatusUpdated(task_id=task.task_id, status=task.status)
@@ -194,15 +204,18 @@ async def decision_stream():
 
 
 @router.post("/{task_id}/events", response_model=EventAppended)
-def append_event(task_id: str, payload: EventAppend, db: Session = Depends(get_db)):
+def append_event(task_id: str, payload: EventAppend, request: Request, db: Session = Depends(get_db)):
     _get_task_or_404(db, task_id)
+    # The actor is the authenticated principal, never client-supplied text.
+    # That identity is part of the snapshot and therefore sealed into the chain.
+    actor = getattr(request.state, "principal", "system")
     try:
         event = decision_ops.append_event(
             db,
             task_id=task_id,
             event_type=payload.event_type,
             summary=payload.summary,
-            actor=payload.actor,
+            actor=actor,
             details=payload.details,
         )
     except PermissionError:

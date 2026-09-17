@@ -15,6 +15,7 @@ from app.db import SessionLocal
 from app.models import Agent, Task, utcnow
 from app.services import decision_ops
 from app.services.event_hub import emit_event
+from app.services.redaction import redact_inputs
 
 logger = logging.getLogger("trustledger.research")
 
@@ -161,12 +162,12 @@ async def research_stream(payload: ResearchStreamRequest, request: Request):
             case_type=payload.case_type or "Prompt run",
             agent_id=agent_id,
             status="queued",
-            inputs={
+            inputs=redact_inputs({
                 "client_name": payload.client_name or "Prompt run",
                 "research_question": query,
                 "prompt": query,
                 "case_type": payload.case_type or "Prompt run",
-            },
+            }),
             created_at=utcnow(),
         )
         db0.add(task)

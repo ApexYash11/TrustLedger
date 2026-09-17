@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .db import Base, SessionLocal, engine
 from .routes import agents, decisions, research
+from .security import auth_middleware
 
 
 @asynccontextmanager
@@ -43,6 +44,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# API-key auth: registered after CORS so preflight OPTIONS passes through first.
+# Enforcement is active only when TRUSTLEDGER_API_KEYS / TRUSTLEDGER_API_KEY is
+# configured (see app/security.py) — dev and tests stay open by default.
+app.middleware("http")(auth_middleware)
 
 
 @app.get("/health", tags=["system"])
