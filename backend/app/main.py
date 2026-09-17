@@ -7,10 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .db import Base, SessionLocal, engine
 from .routes import agents, decisions, research
+from .security import auth_middleware, validate_auth_config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail closed: a malformed auth configuration must refuse to boot rather
+    # than run with authentication silently off (review finding P1).
+    validate_auth_config()
     Base.metadata.create_all(bind=engine)
 
     dispatcher_task = None
@@ -36,6 +40,13 @@ app = FastAPI(
     description="Enterprise AI decision audit & trust layer — logging API, replay, integrity verification.",
     lifespan=lifespan,
 )
+
+# API-key auth first (inner), CORS second (outer). CORS outermost means
+# preflight OPTIONS are answered before auth runs AND auth's own 401/403
+# responses pass back through CORS carrying Access-Control-Allow-Origin, so the
+# browser surfaces the real auth error instead of a generic network failure
+# (review finding P2).
+app.middleware("http")(auth_middleware)
 
 app.add_middleware(
     CORSMiddleware,

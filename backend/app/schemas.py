@@ -21,9 +21,15 @@ class DecisionStart(BaseModel):
 
 
 class EventAppend(BaseModel):
+    """Append an event to a task's trail.
+
+    ``actor`` is deliberately absent: the caller cannot claim an identity. The
+    server stamps the authenticated principal (see app/security.py) so the audit
+    trail records who acted, not who the caller says they are.
+    """
+
     event_type: str
     summary: str
-    actor: str = "agent"
     details: Optional[dict[str, Any]] = None
 
 

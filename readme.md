@@ -60,7 +60,7 @@ panel shows readable progress rather than raw JSON.
   first**, so a tampered record still reads clean on the Summary tab. Fixing
   this is the top open item.
 - The same question can return different outcomes across runs (temperature 0.4).
-- There is **no authentication** on any endpoint.
+- Authentication is API-key based (`TRUSTLEDGER_API_KEYS`, principal stamped into every event's `actor` and sealed into the chain). Full RBAC with row-scoped roles, and encryption at rest, are designed but not built.
 
 Prior milestones: logging API, SHA-256 hash chain, Kanban + 4-tab record view,
 research pivot, 16-record seed (hero `RES-2026-004821`, deliberately tampered

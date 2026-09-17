@@ -14,6 +14,7 @@ from ..models import Agent, AuditRecord, Decision, DecisionEvent, Task, new_uuid
 from ..services.sealer import seal_record
 from agents.registry import has_agent_implementation
 from .event_hub import emit_event
+from .redaction import redact_inputs
 
 TERMINAL_STATUSES = {"completed", "review_required"}
 #: non-terminal statuses a manual PATCH may move a card between (dragging the card)
@@ -59,7 +60,7 @@ def start_decision(db: Session, *, agent_id: str, case_id: str, case_type: str, 
         case_type=case_type,
         agent_id=agent_id,
         status="running",
-        inputs=inputs,
+        inputs=redact_inputs(inputs),
         created_at=now,
         started_at=now,
     )
@@ -102,7 +103,7 @@ def queue_decision(
         case_type=case_type,
         agent_id=agent_id,
         status="queued",
-        inputs=inputs,
+        inputs=redact_inputs(inputs),
         created_at=utcnow(),
     )
     db.add(task)

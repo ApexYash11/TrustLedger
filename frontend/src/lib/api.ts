@@ -1,5 +1,19 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
+/**
+ * Integration key presented on every request.
+ *
+ * Browser-held keys are a DEMO convenience: NEXT_PUBLIC_ variables are baked
+ * into the client bundle, so this key is visible to anyone who opens devtools.
+ * In production the token would come from a session, and the browser would
+ * never hold a long-lived key. See backend/app/security.py.
+ */
+const API_KEY = process.env.NEXT_PUBLIC_TRUSTLEDGER_API_KEY ?? "";
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  return { ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}), ...extra };
+}
+
 /** Custom error that preserves the HTTP status code for callers to inspect. */
 export class ApiError extends Error {
   status: number;
@@ -123,7 +137,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
       if (v !== undefined) url.searchParams.set(k, v);
     });
   }
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw await apiError(res, path);
   return res.json();
 }
@@ -131,7 +145,7 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
     cache: "no-store",
   });
@@ -140,14 +154,14 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  const res = await fetch(`${API_URL}${path}`, { method: "DELETE", cache: "no-store" });
+  const res = await fetch(`${API_URL}${path}`, { method: "DELETE", cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw await apiError(res, path);
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
     cache: "no-store",
   });
@@ -183,7 +197,7 @@ export const api = {
     const url = `${API_URL.replace(/\/api\/v1\/?$/, "")}/api/v1/research/stream`;
     return fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     }).then(async (res) => {
       if (!res.ok || !res.body) throw new Error(`Research stream failed: ${res.status}`);

@@ -18,7 +18,7 @@ cannot exceed a 75s wall-clock budget. The board and record view share one
 vocabulary of status, outcome and risk, and sealed records are visibly immutable.
 `23/23` backend tests pass and the frontend builds clean.
 
-**The integrity layer is the product.** The research quality is the weakest part
+API-key auth attributes every event to a principal that is sealed into the chain, and PII in research inputs is redacted before the model or the ledger sees it. **The integrity layer is the product.** The research quality is the weakest part
 and is scoped accordingly: sources are asserted by the model, not retrieved.
 
 ## 2. Roadmap Position
