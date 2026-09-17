@@ -1,6 +1,6 @@
 # TrustLedger — Current Status
 
-> **Last updated:** 14 September 2026 (Week 4)  
+> **Last updated:** 17 September 2026
 > **Branch:** `feat/live-research-openrouter` → PR #22 · `docs/refresh-readme-and-docs` (this refresh)  
 > **Companion:** `09_HLD.md` (HLD) · `13_Review_Coverage_and_Load_Plan.md` · `14_Frontend_Realism_Plan.md`
 
@@ -8,9 +8,18 @@
 
 ## 1. One-Paragraph Status
 
-TrustLedger is **live with real streaming research**: OpenRouter `openrouter/free` router (free, no credits) drives `ResearchAgent` v1.3.0 via `POST /api/v1/research/stream` (`status → token* → done` SSE), sealing each run as a hash-chained, graph-shaped decision record (evidence/policy nodes linked to the recommendation, visualized in `DecisionGraph`). Board is minimal (single `Add Task`, `Ask a research question…` prompt, no stats/filter noise), detail dedupes `What was asked` and shows the knowledge graph hero. Backend `23/23` tests pass, frontend builds `5.94kB`, seed `16` records plus live stream records (tampered `RES-2026-009999` demonstrates `verify: broken`). Superseded PRs #11, #18, #19 closed into #22.
+TrustLedger records AI research decisions as tamper-evident, hash-chained
+audit records. A question enters via `POST /api/v1/research/stream`, the agent
+answers through OpenRouter (default `openai/gpt-4o-mini`), every step is logged
+as a `decision_event`, and the whole record — question, events, sources,
+standards, rationale, outcome — is frozen into a SHA-256 snapshot chained to the
+record before it. Runs complete in 4-10s, survive a client disconnect, and
+cannot exceed a 75s wall-clock budget. The board and record view share one
+vocabulary of status, outcome and risk, and sealed records are visibly immutable.
+`23/23` backend tests pass and the frontend builds clean.
 
----
+**The integrity layer is the product.** The research quality is the weakest part
+and is scoped accordingly: sources are asserted by the model, not retrieved.
 
 ## 2. Roadmap Position
 
@@ -31,10 +40,10 @@ Architecture    Agent+Seed      Trail/Replay    Graph+Polish
 | `POST /decisions/start|events|complete` (seal + hash) | ✅ Done | `routes/decisions.py` 9 endpoints |
 | `POST /research/stream` SSE | ✅ Done | `routes/research.py:19` — streaming LLM + ledger seal |
 | `GET /decisions/{id}{/replay|/verify}` + `GET /decisions/chain/verify` | ✅ Done | `hash_chain.py:GENESIS`, `sealer.py`, `replay.py` |
-| OpenRouter LLM service | ✅ Done | `services/llm.py:1` — `openrouter/free`, fallback to template, 60s timeout |
+| OpenRouter LLM service | ✅ Done | `services/llm.py` — pinned model, `max_tokens` cap, JSON response format, template fallback |
 | ResearchAgent + ComplianceBot | ✅ Done | `research_agent.py:1.3.0` LLM+template, `dispatcher_loop` 0.7s |
-| Seed (16 + live) | ✅ Done | `demo_data.json` 5 hand-crafted + 7 quick + 2 running + 2 queued; live stream adds `RES-…-e97325` etc |
-| Board (minimal) + Detail (4 tabs) + Graph | ✅ Done | `page.tsx:5.94kB` minimal, `decisions/[taskId]:7.48kB` with `DecisionGraph.tsx` |
+| Seed (16 + live) | ✅ Done | 5 hand-crafted + 7 quick + 2 running + 2 queued; every seeded task now carries a real research question |
+| Board + Record (4 tabs) + Graph | ✅ Done | Shared `vocab.ts` palette, sealed-state affordances, computed-layout SVG graph |
 | Docker Compose | ✅ Ready | `postgres + backend + frontend`, `env_file .env` |
 | Tests `23/23` | ✅ Done | 5 hash + 7 API + 11 runtime/integrity/dispatcher |
 
@@ -47,7 +56,7 @@ Architecture    Agent+Seed      Trail/Replay    Graph+Polish
 ```
 TrustLedger/  (PR #22 → this docs refresh)
 ├── backend/
-│   ├── app/services/llm.py         OpenRouter streaming (openrouter/free)
+│   ├── app/services/llm.py         OpenRouter streaming (TRUSTLEDGER_MODEL)
 │   ├── app/routes/research.py      POST /research/stream SSE (status/token/done)
 │   ├── app/routes/decisions.py     9 endpoints + stream + verify chain
 │   ├── agents/research_agent.py    LLM+template, 1.3.0
@@ -61,7 +70,7 @@ TrustLedger/  (PR #22 → this docs refresh)
 │   └── src/lib/api.ts              streamResearch SSE client
 ├── docs/13_Review_Coverage_and_Load_Plan.md  skip-review + <400ms plan
 ├── docs/14_Frontend_Realism_Plan.md         Deloitte-grade realism plan
-└── .env.example                    OPENROUTER_API_KEY, TRUSTLEDGER_MODEL=openrouter/free
+└── .env.example                    OPENROUTER_API_KEY, TRUSTLEDGER_MODEL
 ```
 
 ---
@@ -75,7 +84,7 @@ TrustLedger/  (PR #22 → this docs refresh)
 | API flow (7) | lifecycle verify pass, tampered fails, 409 sealed, 422 rationale, 404 agent, list filters, chain verify |
 | Runtime/dispatcher (11) | queued→running claim, no double-claim, idempotent register, terminal guard, requeue on crash, SSE |
 
-### Live streaming test (Sep 14, `openrouter/free`)
+### Live streaming test (Sep 14, `openrouter/free`; re-measured Sep 17)
 ```
 POST /research/stream "Should Tata Power enter Rajasthan EV charging in FY27?"
 → status: Research started (task ...-e97325, running)
@@ -94,7 +103,7 @@ POST /research/stream "Should Tata Power enter Rajasthan EV charging in FY27?"
 ## 5. Key Decisions Since Last Update
 | Decision | Rationale |
 |----------|-----------|
-| `openrouter/free` as default model | Real streaming with 0 credits; paid `gpt-4o-mini` needs 402 |
+| Model choice | `openrouter/free` costs nothing but is a **router**: measured over 3 runs it returned one empty response and one web-search tool call instead of an answer. `openai/gpt-4o-mini` returned all 12 fields on 3/3 runs in 4-10s. Pin a model for a demo; the free router is fine for offline development. |
 | `POST /research/stream` SSE instead of only `/decisions/queue` + dispatcher | User-requested query→streaming→record flow; prompt bar streams live |
 | `DecisionGraph` SVG in Summary | User-requested decision tree linking evidence/policy → outcome (was missing) |
 | Remove board stats/filter/tip + sidebar AI-decides card + column Add Task duplicates | User-requested declutter: fewer buttons/text, single Add Task |
@@ -121,7 +130,7 @@ POST /research/stream "Should Tata Power enter Rajasthan EV charging in FY27?"
 
 ## 8. How to Run (Current)
 ```bash
-cp .env.example .env  # set OPENROUTER_API_KEY=sk-or-v1-... ; TRUSTLEDGER_MODEL=openrouter/free
+cp .env.example .env  # set OPENROUTER_API_KEY=... ; TRUSTLEDGER_MODEL=openai/gpt-4o-mini
 cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000  # :8000/docs
 cd backend && python -m pytest tests -q  # 23 passed
 cd frontend && npm install && npm run dev  # :3000 — Ask a research question… streams live

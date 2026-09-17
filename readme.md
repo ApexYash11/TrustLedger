@@ -25,7 +25,7 @@ The agent decides. TrustLedger records and verifies.
 | [docs/09_HLD.md](docs/09_HLD.md) | High-level design with diagrams |
 | [docs/10_Current_Status.md](docs/10_Current_Status.md) | Implementation status and evidence (updated Sep 14) |
 | [docs/11_Domain_Pivot_Discussion.md](docs/11_Domain_Pivot_Discussion.md) | Assessment + plan for the Deloitte client-research pivot |
-| [docs/12_Graph_Knowledge_System.md](docs/12_Graph_Knowledge_System.md) | Graph-shaped evidence: nodes, edges, provenance |
+| [docs/12_Graph_Knowledge_System.md](docs/12_Graph_Knowledge_System.md) | Evidence graph: what ships, and what does not |
 | [docs/13_Review_Coverage_and_Load_Plan.md](docs/13_Review_Coverage_and_Load_Plan.md) | Review coverage + dashboard load <400ms plan |
 | [docs/14_Frontend_Realism_Plan.md](docs/14_Frontend_Realism_Plan.md) | Frontend realism (Deloitte-grade) plan |
 | [docs/README.md](docs/README.md) | Full project overview |
@@ -36,8 +36,42 @@ Source of truth for the problem statement: `TrustLedger_EOI_Enhanced.pptx`
 
 ## Status
 
-**Sep 14 — feat/live-research-openrouter (PR #22):** Real research agent via **OpenRouter `openrouter/free` router** (free, no credits), SSE `POST /api/v1/research/stream` (`status → token* → done`), knowledge-graph decision record with linked evidence/policy nodes (`frontend/src/components/DecisionGraph.tsx`), minimal board (single `Add Task`, `Ask a research question…` prompt), deduped detail view, `23/23` tests pass. Prior milestones: full logging API, SHA-256 hash chain, Kanban + 4-tab overview, research pivot + 16-record seed (hero `RES-2026-004821`, tampered `RES-2026-009999`) — see `docs/10_Current_Status.md`.
+**Sep 17 — reliability + UI pass.** The streaming research endpoint now runs in a
+background task, so a browser navigating away mid-run still seals the record
+instead of stranding the card in `running`; a wall-clock budget
+(`TRUSTLEDGER_RUN_BUDGET`, default 75s) guarantees a run cannot hang. Runs land
+in 4-10s on a pinned model. Truncated model JSON is repaired rather than dumped
+as raw text, and a response carrying none of the expected fields is rejected
+instead of sealing an empty record.
 
-**Branches:** `main` ← `feat/live-research-openrouter` (PR #22) · `docs/refresh-readme-and-docs` (this docs refresh). Closed superseded: #11, #18, #19 (all folded into #22).
+On the UI: a shared vocabulary (`frontend/src/lib/vocab.ts`) gives every status,
+outcome and risk level one label, one colour and one plain-English meaning;
+sealed records advertise their immutability instead of offering actions the API
+refuses; the decision graph is redrawn as a single computed SVG; and the live
+panel shows readable progress rather than raw JSON.
 
-**Run:** `TRUSTLEDGER_MODEL=openrouter/free` + `OPENROUTER_API_KEY` in `.env` → `POST /research/stream` streams live. See `docs/README.md` for architecture, how to run, and limitations.
+**Known limits — read before demoing:**
+- Cited sources are **asserted by the model, not retrieved**. No URL, no fetch,
+  no verification that a cited document exists. See `docs/12`.
+- The hash chain is **unkeyed**. It detects a post-hoc edit, but anyone who can
+  write to the database can recompute the whole chain. Tamper-evident, not
+  tamper-proof.
+- `GET /decisions/{id}` serves the sealed snapshot **without verifying it
+  first**, so a tampered record still reads clean on the Summary tab. Fixing
+  this is the top open item.
+- The same question can return different outcomes across runs (temperature 0.4).
+- There is **no authentication** on any endpoint.
+
+Prior milestones: logging API, SHA-256 hash chain, Kanban + 4-tab record view,
+research pivot, 16-record seed (hero `RES-2026-004821`, deliberately tampered
+`RES-2026-009999`). `23/23` backend tests pass; frontend builds clean.
+
+**Run:** put `OPENROUTER_API_KEY` in `.env`, then start the backend and frontend
+(see `docs/README.md`). Note that **nothing in the backend loads `.env`** — there
+is no `python-dotenv` — so a local `uvicorn` run needs the variables exported by
+hand. Docker Compose picks them up via `env_file`.
+
+`TRUSTLEDGER_MODEL` defaults to `openai/gpt-4o-mini`. The `openrouter/free`
+router is cheaper but picks a different model per request: across three test
+runs it returned one empty response and one web-search tool call instead of an
+answer. Pin a model for anything you intend to demo.

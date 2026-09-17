@@ -1,98 +1,123 @@
-# Research Agent About Graph-Based Knowledge System for AI Agent
+# Evidence Graph — What Ships, and What Does Not
 
-Local knowledge base for the TrustLedger Research Agent: how the agent's
-graph-shaped evidence (entities, relationships, and supporting passages)
-feeds the tamper-evident decision record.
+How the research agent's grounding facts (sources and methodology clauses)
+attach to a decision, and how they are rendered.
 
-## 1. What the knowledge graph is
+> **Scope note.** An earlier draft of this document described a general
+> knowledge-graph engine: node and edge tables, seven typed relationships,
+> passage-level provenance, and a traversal that counted independent sources.
+> **None of that was built.** This version describes what the code actually
+> does. Section 6 lists the gap, deliberately, so the claim and the
+> implementation cannot drift apart again.
 
-The research agent does not reason over flat documents. It builds a small,
-case-scoped knowledge graph per task:
+## 1. What actually exists
 
-- **Nodes** - entities the research question touches: clients, markets,
-  competitors, regulations, policies, evidence sources, risk factors.
-- **Edges** - typed relationships: `supports`, `contradicts`, `applies_to`,
-  `cites`, `validates`, `supersedes`, `flags_risk`.
-- **Passages** - the grounding text behind each node/edge: tariff orders,
-  market outlooks, financial filings, methodology clauses.
+Each decision carries two kinds of grounding fact:
 
-Every node and edge carries provenance: source title, publisher, retrieval
-time, and relevance to the research question. Nothing enters the graph
-without a source.
+- **Sources** (`evidence`) — what the agent cited: title, source, type, a
+  content summary, and why it was relevant.
+- **Standards** (`policy_references`) — the methodology clauses applied:
+  code, section, title, an excerpt, and how it was applied.
 
-## 2. How the agent uses it (per task)
+Both are written into the `details` JSON of a `decision_event` as it happens,
+and read back at query time by
+`extract_evidence_and_policies()` in `backend/app/services/sealer.py`.
 
-1. **Retrieve** - gather engagement brief, market data, regulatory texts,
-   and methodology clauses (`data_retrieved`, `policy_retrieved` events).
-2. **Extract** - identify entities and candidate relationships from each
-   source (`clause_identified` with a `policy_reference` payload).
-3. **Link** - attach evidence nodes to the claims they support or
-   contradict (`evidence_evaluated` with an `evidence` payload).
-4. **Reason** - walk the graph: which claims have 3+ independent
-   demand-side sources? Which lack a validated cost baseline? Conflicts
-   become `supporting_factors` or escalation triggers.
-5. **Decide** - emit `outcome`, `outcome_summary`, and
-   `structured_rationale` (`primary_reason`, `supporting_factors`,
-   `policy_basis`, `evidence_basis`, `exclusions_applied`).
-6. **Seal** - `complete_decision` writes the Decision plus a SHA-256
-   hash-chained AuditRecord. The graph's evidence/policy references are
-   part of the sealed snapshot.
+There is **no node table, no edge table, and no traversal**. The "graph" is a
+one-hop provenance structure — question → facts → outcome — which is all the
+data supports.
 
-## 3. Graph-to-ledger mapping
+## 2. Storage shape
 
-| Graph concept | TrustLedger record |
+| Concept | Where it actually lives |
 |---|---|
-| Evidence node | `evidence` row + `evidence_evaluated` event |
-| Policy/methodology node | `policy_reference` + `policy_retrieved` / `clause_identified` event |
-| Support/contradict edge | `supporting_factors`, `policy_basis`, `evidence_basis` in `structured_rationale` |
-| Unresolved conflict | `requires_human_review=True`, status `review_required`, `human_review_triggered` event |
-| Full traversal | `decision_events` ordered by `sequence` (Decision Trail / Replay) |
+| Source | `decision_events.details.evidence` on an `evidence_evaluated` event |
+| Standard | `decision_events.details.policy_reference` on a `policy_retrieved` / `clause_identified` event |
+| Relationship | Implicit in the event type; rendered as `supports` / `applies_to` |
+| Reasoning | `decisions.structured_rationale` (`primary_reason`, `supporting_factors`, `policy_basis`, `evidence_basis`, `exclusions_applied`) |
+| Ordering | `decision_events.sequence` — the Decision Trail and Replay tabs |
 
-## 4. Integrity rules
+`evidence_id` values (`ev-001`, …) are generated positionally at read time.
+They are **not stable identifiers** and must not be used as foreign keys.
+
+## 3. How it is rendered
+
+`frontend/src/components/DecisionGraph.tsx` draws client → question → facts →
+recommendation as a single SVG with a computed layout. Blue edges are sources
+(`supports`), amber are standards (`applies_to`).
+
+Two constraints worth knowing:
+
+- Node positions and edge endpoints derive from the same numbers, inside one
+  `viewBox`. An earlier version mixed HTML nodes at fixed pixel offsets with a
+  stretched SVG, so edges drifted from their boxes as the viewport changed.
+- The diagram caps at 4 sources and 3 standards for legibility. Full text lives
+  in the Sources / Standards cards directly beneath it, since SVG cannot wrap
+  text.
+
+When a record has no research question, the question node renders red and says
+so rather than falling back to the case ID — a record where the agent answered
+something nobody asked is exactly the failure the UI should surface.
+
+## 4. Where the facts come from — read this before demoing
+
+**Sources are asserted by the model, not retrieved.** Nothing is fetched. There
+is no URL, no document store, and no check that a cited document exists or says
+what the citation claims. With `OPENROUTER_API_KEY` set, the model is asked for
+`evidence_details` and `policy_details` and whatever it returns is recorded.
+With no key, the deterministic template in
+`backend/agents/research_agent.py` supplies fixed placeholder facts.
+
+This matters for how the project is described. TrustLedger's claim is
+**"whatever the agent cited, this proves what it cited and that the record has
+not changed since"** — not "these citations are real."
+
+## 5. Integrity rules
 
 - A task reaches `completed` / `review_required` only through
-  `POST /complete`, which seals a Decision + AuditRecord (manual PATCH to
-  terminal states is rejected with `TASK_NOT_SEALED`).
-- Sealed tasks cannot be edited or deleted (`TASK_SEALED`).
+  `complete_decision`, which always seals a `Decision` + `AuditRecord`.
+  A manual status PATCH to a terminal state is rejected with `TASK_NOT_SEALED`.
+- Sealed tasks cannot be edited or deleted (`TASK_SEALED`). The board reflects
+  this: sealed cards are not draggable and offer no status actions.
 - Verification recomputes the record hash and checks chain linkage
   (`GET /decisions/{task_id}/verify`, `GET /decisions/chain/verify`).
-- One seeded record (`RES-2026-009999`) is deliberately tampered post-seal
-  so the verify path can be demonstrated as failing.
+- One seeded record (`RES-2026-009999`) is deliberately tampered post-seal so
+  the failing verify path can be demonstrated.
 
-## 5. Live runtime behavior
+## 6. Not built (and honest about it)
 
-- Queue with `POST /decisions/queue`; the dispatcher (`agents/runtime.py`,
-  2s tick) claims the oldest `queued` task and runs the registered
-  `DiveAgent` for its domain (`ResearchAgent` for
-  `deloitte_client_research`, `ComplianceBot` for `regulatory_compliance`).
-- Each step emits `event_appended` + `status_changed` on the SSE hub
-  (`GET /decisions/stream`); the Kanban patches cards within ~1-3s while
-  the 30s poll stays as a resync fallback.
-- Try: `python demo_live_run.py --sse-seconds 14` and watch
-  http://localhost:3000 move Queued -> Running -> Completed.
+| Claimed in the earlier draft | Status |
+|---|---|
+| Node / edge tables | Not built. Facts live in event JSON. |
+| Seven typed edges (`contradicts`, `cites`, `validates`, `supersedes`, `flags_risk`) | Not built. Only `supports` / `applies_to` are rendered, derived from event type. |
+| Passage-level provenance | Not built. A source has a title and a summary, no passage anchor. |
+| Graph traversal ("which claims have 3+ independent sources") | Not built. No query walks the facts. |
+| Retrieval of real documents | Not built. See section 4. |
 
-## 6. Worked mini-example (EV charging)
+These are the honest next steps if the graph is to become real: persist nodes
+and typed edges at seal time, then make the diagram and a traversal read from
+them rather than from event JSON.
 
-Research question: should Tata Power enter commercial EV fast-charging in
-Rajasthan in FY27?
+## 7. Live runtime behaviour
 
-- Nodes: Tata Power, Rajasthan market, BNEF Outlook 2026, tariff order,
-  DEL-RM-2026 Sec 5.3, competitor cost baseline (conflicted).
-- Edges: Outlook `supports` pilot entry; tariff order `validates` margin
-  model; Sec 5.3 `applies_to` the entry test; conflicting baseline
-  `contradicts` full-scale entry.
-- Outcome: `recommended_with_caveats` (phased pilot) + `supporting_factors`
-  citing the demand sources; the cost-baseline conflict is recorded in
-  `exclusions_applied` rather than hidden.
+- `POST /api/v1/research/stream` runs a question end to end and streams
+  progress. The run executes in a background task, so a browser navigating
+  away mid-run still seals the record, and a wall-clock budget
+  (`TRUSTLEDGER_RUN_BUDGET`, default 75s) guarantees it never hangs.
+- `POST /decisions/queue` puts a task in the `queued` lane; the dispatcher
+  (`agents/runtime.py`, `TRUSTLEDGER_POLL` tick) claims it and runs the
+  registered `DiveAgent` for its domain.
+- Both paths emit `status_changed` / `event_appended` on the SSE hub
+  (`GET /decisions/stream`), so the board updates live.
 
-## 7. Where to read more in this repo
+## 8. Where to read more
 
 - Agent contract: `backend/agents/base.py`; implementations:
   `backend/agents/research_agent.py`, `backend/agents/compliance_bot.py`
 - Dispatch: `backend/agents/runtime.py`, `backend/agents/registry.py`
 - Lifecycle: `backend/app/services/decision_ops.py`; sealing:
-  `backend/app/services/sealer.py`; hashes:
+  `backend/app/services/sealer.py`; hashing:
   `backend/app/services/hash_chain.py`
-- Live feed: `backend/app/services/event_hub.py`, `GET /decisions/stream`
-- Product docs: `docs/02_Data_Driven_Design.md`,
-  `docs/03_Agent_Based_Design.md`, `docs/05_Tech_Stack_and_Architecture.md`
+- Live feed: `backend/app/services/event_hub.py`
+- Rendering: `frontend/src/components/DecisionGraph.tsx`,
+  `frontend/src/lib/vocab.ts`
