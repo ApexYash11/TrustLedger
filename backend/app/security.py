@@ -97,7 +97,11 @@ async def auth_middleware(request: Request, call_next):
     answered before authentication runs.
     """
     path = request.url.path
-    if not auth_enabled() or path in PUBLIC_PATHS or not path.startswith("/api/"):
+    # CORS preflight: browsers send an OPTIONS probe before any request with an
+    # Authorization header. It carries no key and touches no data, so it must
+    # pass straight through to the CORS middleware — auth runs outside CORS, so
+    # rejecting it here kills every browser request before it starts.
+    if request.method == "OPTIONS" or not auth_enabled() or path in PUBLIC_PATHS or not path.startswith("/api/"):
         return await call_next(request)
 
     principal = principal_of(request)
