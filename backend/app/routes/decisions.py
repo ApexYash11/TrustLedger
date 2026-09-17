@@ -249,6 +249,9 @@ def list_decisions(
         query = query.filter(Task.case_id.ilike(f"%{case_id}%"))
     tasks = query.order_by(Task.created_at.desc()).all()
 
+    # One query for the whole board rather than a sealed-check per task.
+    sealed_ids = {row[0] for row in db.query(AuditRecord.task_id).all()}
+
     summaries = []
     for task in tasks:
         decision = db.query(Decision).filter(Decision.task_id == task.task_id).first()
@@ -269,6 +272,8 @@ def list_decisions(
                 duration_seconds=duration,
                 human_review_status=task.human_review_status,
                 created_at=_iso(task.created_at),
+                research_question=(task.inputs or {}).get("research_question") or (task.inputs or {}).get("prompt"),
+                sealed=task.task_id in sealed_ids,
             )
         )
     return {"decisions": summaries, "total": len(summaries)}

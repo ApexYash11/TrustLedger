@@ -24,6 +24,10 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.environ.get("TRUSTLEDGER_MODEL", "openai/gpt-4o-mini")
 # Fast + cheap default; user can override via .env TRUSTLEDGER_MODEL
 TIMEOUT_SECS = float(os.environ.get("TRUSTLEDGER_LLM_TIMEOUT", "60"))
+# Output length is the dominant term in end-to-end latency: the model emits one
+# token at a time, so an unbounded response is an unbounded wait. Capping it
+# keeps a run inside the budget enforced by routes/research.py.
+MAX_TOKENS = int(os.environ.get("TRUSTLEDGER_MAX_TOKENS", "1400"))
 
 SYSTEM_PROMPT = (
     "You are a Deloitte client-research analyst. You produce concise, defensible "
@@ -37,7 +41,15 @@ SYSTEM_PROMPT = (
     "policy_basis (list), evidence_basis (list), exclusions_applied (list), "
     "outcome (one of the 4), outcome_summary (1-2 sentences), confidence_score, "
     "requires_human_review (bool), risk_level (low|medium|high), evidence_details (list of {title,source,content_summary,relevance}), "
-    "policy_details (list of {policy_code,section,title,text_excerpt,application})."
+    "policy_details (list of {policy_code,section,title,text_excerpt,application}).\n"
+    "BREVITY IS REQUIRED — the response is truncated past a hard token limit, and a "
+    "cut-off reply cannot be parsed. Stay within ALL of these limits:\n"
+    "- outcome_summary: at most 40 words\n"
+    "- primary_reason: at most 50 words\n"
+    "- supporting_factors, policy_basis, evidence_basis, exclusions_applied: at most 3 items, one short phrase each\n"
+    "- evidence_details: at most 3 items; content_summary at most 25 words\n"
+    "- policy_details: at most 2 items; text_excerpt at most 25 words\n"
+    "Return only the JSON object — no markdown fences, no prose before or after."
 )
 
 
@@ -88,6 +100,7 @@ async def complete(
     payload = {
         "model": model or DEFAULT_MODEL,
         "temperature": temperature,
+        "max_tokens": MAX_TOKENS,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
@@ -126,6 +139,10 @@ async def stream_complete(
         "model": model or DEFAULT_MODEL,
         "temperature": temperature,
         "stream": True,
+        "max_tokens": MAX_TOKENS,
+        # Match the non-streaming call: the system prompt demands strict JSON, so
+        # ask the provider to enforce it instead of relying on brace-scanning.
+        "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},

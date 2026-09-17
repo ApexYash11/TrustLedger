@@ -29,26 +29,26 @@ GENERATED_RUNNING = 2
 
 # Templates for generated completed cases (varied outcomes for Kanban realism)
 QUICK_TEMPLATES = [
-    {"case_id": "RES-2026-005310", "case_type": "Market Scan — FMCG Snacking", "client": "Hindustan Unilever",
+    {"case_id": "RES-2026-005310", "question": 'Should Hindustan Unilever enter the premium snacking segment in FY27?', "case_type": "Market Scan — FMCG Snacking", "client": "Hindustan Unilever",
      "risk": "low", "outcome": "recommended",
      "summary": "Recommended: enter the premium snacking segment; category growing 14% YoY across all panels."},
-    {"case_id": "RES-2026-005428", "case_type": "Vendor Risk Assessment — Cloud Migration", "client": "Flipkart",
+    {"case_id": "RES-2026-005428", "question": 'Is the shortlisted cloud vendor acceptable given its pending data-residency certification?', "case_type": "Vendor Risk Assessment — Cloud Migration", "client": "Flipkart",
      "risk": "medium", "outcome": "recommended_with_caveats",
      "summary": "Recommended with caveats: proceed with the shorter-listed vendor; data-residency certification still pending."},
-    {"case_id": "RES-2026-005455", "case_type": "Regulatory Scan — Data Privacy", "client": "PayZippy",
+    {"case_id": "RES-2026-005455", "question": 'Can PayZippy launch its wallet feature before DPDP compliance sign-off?', "case_type": "Regulatory Scan — Data Privacy", "client": "PayZippy",
      "risk": "medium", "outcome": "not_recommended",
      "summary": "Not recommended: launch the wallet feature only after DPDP compliance sign-off; current flow breaches consent norms."},
-    {"case_id": "RES-2026-005501", "case_type": "Cost Optimization Study — Manufacturing", "client": "Royal Enfield",
+    {"case_id": "RES-2026-005501", "question": 'Should Royal Enfield adopt the proposed two-shift plant layout?', "case_type": "Cost Optimization Study — Manufacturing", "client": "Royal Enfield",
      "risk": "low", "outcome": "recommended",
      "summary": "Recommended: adopt the two-shift layout; validated ₹3.4 crore annual saving with no capex."},
-    {"case_id": "RES-2026-005566", "case_type": "ESG Disclosure Readiness — Cement", "client": "Dalmia Bharat",
+    {"case_id": "RES-2026-005566", "question": "Are Dalmia Bharat's FY27 BRSR disclosures achievable with the proposed emissions pipeline?", "case_type": "ESG Disclosure Readiness — Cement", "client": "Dalmia Bharat",
      "risk": "medium", "outcome": "recommended",
      "summary": "Recommended: FY27 BRSR disclosures are achievable with the proposed emissions data pipeline."},
-    {"case_id": "RES-2026-005602", "case_type": "Cyber Risk Assessment — Insurance", "client": "ICICI Lombard",
+    {"case_id": "RES-2026-005602", "question": 'Does the third-party API exposure allow issuing the cyber risk report without partner review?', "case_type": "Cyber Risk Assessment — Insurance", "client": "ICICI Lombard",
      "risk": "high", "outcome": "escalated",
      "summary": "Escalated: conflicting findings on third-party API exposure; routed for partner review before the report is issued.",
      "review": True},
-    {"case_id": "RES-2026-005644", "case_type": "Pricing Analysis — Quick Commerce", "client": "Zepto",
+    {"case_id": "RES-2026-005644", "question": 'What delivery fee maximises retention without breaching the competitor price band?', "case_type": "Pricing Analysis — Quick Commerce", "client": "Zepto",
      "risk": "low", "outcome": "recommended",
      "summary": "Recommended: 6-minute delivery fee of ₹19 maximizes retention without breaching the ₹24 competitor band."},
 ]
@@ -56,6 +56,7 @@ QUICK_TEMPLATES = [
 RUNNING_PARTIALS = [
     {"case_id": "RES-2026-005701", "case_type": "M&A Screening — Logistics Target", "client": "Mahindra Electric",
      "engagement_code": "ENG-2026-ME-009",
+     "research_question": "Is the logistics target's valuation band defensible given its pending tax litigation?",
      "events": [
          ("data_retrieved", "Client mandate and target data pack retrieved", "agent"),
          ("policy_retrieved", "Methodology DEL-RM-2026 loaded", "agent"),
@@ -63,6 +64,7 @@ RUNNING_PARTIALS = [
      ]},
     {"case_id": "RES-2026-005718", "case_type": "Regulatory Scan — Lending Norms", "client": "Ola Financial Services",
      "engagement_code": "ENG-2026-OF-004",
+     "research_question": "How do the latest RBI unsecured-lending circulars affect the proposed credit line?",
      "events": [
          ("data_retrieved", "RBI circular set verified current", "agent"),
          ("evidence_evaluated", "State-norms comparison table downloading, evaluation in progress", "system"),
@@ -182,7 +184,9 @@ def _seed_quick_completed(db, agent, tpl, base):
         inputs={
             "client_name": tpl["client"],
             "engagement_code": f"ENG-2026-{tpl['case_id'][-3:]}-X",
-            "research_question": tpl["summary"].split(": ", 1)[-1],
+            # Use the template's own question. Deriving it from the summary
+            # made the "question" a restatement of the answer.
+            "research_question": tpl["question"],
         },
         created_at=base,
         started_at=base + timedelta(seconds=1),
@@ -247,7 +251,11 @@ def _seed_running(db, agent, spec, base):
         case_type=spec["case_type"],
         agent_id=agent.agent_id,
         status="running",
-        inputs={"client_name": spec["client"], "engagement_code": spec["engagement_code"]},
+        inputs={
+            "client_name": spec["client"],
+            "engagement_code": spec["engagement_code"],
+            "research_question": spec["research_question"],
+        },
         created_at=base,
         started_at=base + timedelta(seconds=1),
     )
@@ -260,13 +268,24 @@ def _seed_running(db, agent, spec, base):
     db.commit()
 
 
-def _seed_queued(db, agent, case_id, case_type, client, engagement_code, base):
+def _seed_queued(db, agent, case_id, case_type, client, engagement_code, base, research_question):
+    """Queue a task the agent can actually answer.
+
+    ``research_question`` is required: a task carrying only a client name gives
+    the model nothing to answer, so it invents both the question and the sources
+    it cites — and that fabrication is then sealed to the chain as if it were
+    grounded work.
+    """
     task = Task(
         case_id=case_id,
         case_type=case_type,
         agent_id=agent.agent_id,
         status="queued",
-        inputs={"client_name": client, "engagement_code": engagement_code},
+        inputs={
+            "client_name": client,
+            "engagement_code": engagement_code,
+            "research_question": research_question,
+        },
         created_at=base,
         started_at=None,
     )
@@ -364,8 +383,10 @@ def main():
         print("  done.")
 
         print(f"Generating {GENERATED_QUEUED} queued tasks...")
-        _seed_queued(db, agent, "RES-2026-005801", "Market Entry Study — Quick Commerce", "Blinkit", "ENG-2026-BK-006", now - timedelta(minutes=12))
-        _seed_queued(db, agent, "RES-2026-005814", "Due Diligence — Fintech Target", "Razorpay", "ENG-2026-RP-001", now - timedelta(minutes=5))
+        _seed_queued(db, agent, "RES-2026-005801", "Market Entry Study — Quick Commerce", "Blinkit", "ENG-2026-BK-006", now - timedelta(minutes=12),
+                     "Should Blinkit expand its dark-store network into tier-2 cities in FY27?")
+        _seed_queued(db, agent, "RES-2026-005814", "Due Diligence — Fintech Target", "Razorpay", "ENG-2026-RP-001", now - timedelta(minutes=5),
+                     "Do Razorpay's disclosed financials and licence position support proceeding to term sheet?")
         print("  done.")
 
         print("\nTampering RES-2026-009999 post-seal (integrity fail demo)...")
