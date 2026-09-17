@@ -8,6 +8,7 @@ Usage (Terminal Oxromer / any terminal in D:\\TrustLedger):
 """
 import argparse
 import json
+import os
 import time
 import urllib.request
 
@@ -16,8 +17,13 @@ BASE = "http://127.0.0.1:8000/api/v1"
 
 def call(method, path, payload=None):
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(BASE + path, data=data, method=method,
-                                 headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    # Present the integration key when one is configured, so this script also
+    # works against a server running in enforced-auth mode.
+    key = os.environ.get("TRUSTLEDGER_API_KEY", "")
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    req = urllib.request.Request(BASE + path, data=data, method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=10) as r:
         body = r.read().decode()
         return r.status, json.loads(body) if body else None
