@@ -127,6 +127,8 @@ def update_task_status(task_id: str, payload: StatusUpdate, request: Request, db
 
 @router.post("/start", response_model=DecisionStartResponse)
 def start_decision(payload: DecisionStart, db: Session = Depends(get_db)):
+    if not payload.case_id:
+        payload.case_id = decision_ops.generate_case_id(db)
     try:
         task = decision_ops.start_decision(
             db,
@@ -141,6 +143,8 @@ def start_decision(payload: DecisionStart, db: Session = Depends(get_db)):
 @router.post("/queue", response_model=DecisionStartResponse)
 def queue_decision(payload: DecisionStart, db: Session = Depends(get_db)):
     """Create a card directly in the ``queued`` lane for the dispatcher to claim."""
+    if not payload.case_id:
+        payload.case_id = decision_ops.generate_case_id(db)
     try:
         task = decision_ops.queue_decision(
             db,

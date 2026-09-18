@@ -15,7 +15,7 @@ class AgentCreate(BaseModel):
 
 class DecisionStart(BaseModel):
     agent_id: str
-    case_id: str
+    case_id: Optional[str] = None  # omitted -> backend generates RES-YYYY-######
     case_type: str
     inputs: dict[str, Any]
 
