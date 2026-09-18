@@ -1,77 +1,189 @@
 # TrustLedger
 
-**Enterprise AI Decision Audit & Trust Layer**  
+**Enterprise AI Decision Audit & Trust Layer**
+
+> The agent decides. TrustLedger records and verifies.
+
 Deloitte Capstone 2026 · Team Diet Coke · Manipal University Jaipur
 
-TrustLedger wraps around existing AI agents and captures a standardized, tamper-evident decision record **while the decision is happening** — so compliance and audit teams can understand, replay, and defend high-stakes AI decisions in minutes, not days.
-
-The agent decides. TrustLedger records and verifies.
-
----
-
-## Quick links
-
-| Document | What it covers |
-|----------|----------------|
-| [docs/00_Project_Summary.md](docs/00_Project_Summary.md) | Thesis, MVP, risks, next priorities |
-| [docs/01_PRD.md](docs/01_PRD.md) | Product requirements |
-| [docs/02_Data_Driven_Design.md](docs/02_Data_Driven_Design.md) | Schema and example decision record |
-| [docs/03_Agent_Based_Design.md](docs/03_Agent_Based_Design.md) | Agent integration and API contract (incl. streaming research) |
-| [docs/04_Dashboard_Design.md](docs/04_Dashboard_Design.md) | Kanban, knowledge graph, trail, replay, integrity UI |
-| [docs/05_Tech_Stack_and_Architecture.md](docs/05_Tech_Stack_and_Architecture.md) | Stack choices and architecture (FastAPI + OpenRouter + hash chain) |
-| [docs/06_Demo_Showcase_Flow.md](docs/06_Demo_Showcase_Flow.md) | 3–5 minute evaluator demo script |
-| [docs/07_Weekly_Roadmap.md](docs/07_Weekly_Roadmap.md) | 4-week plan to second week of September |
-| [docs/08_Scope_and_Non_Goals.md](docs/08_Scope_and_Non_Goals.md) | What we will and will not build |
-| [docs/09_HLD.md](docs/09_HLD.md) | High-level design with diagrams |
-| [docs/10_Current_Status.md](docs/10_Current_Status.md) | Implementation status and evidence (updated Sep 14) |
-| [docs/11_Domain_Pivot_Discussion.md](docs/11_Domain_Pivot_Discussion.md) | Assessment + plan for the Deloitte client-research pivot |
-| [docs/12_Graph_Knowledge_System.md](docs/12_Graph_Knowledge_System.md) | Evidence graph: what ships, and what does not |
-| [docs/13_Review_Coverage_and_Load_Plan.md](docs/13_Review_Coverage_and_Load_Plan.md) | Review coverage + dashboard load <400ms plan |
-| [docs/14_Frontend_Realism_Plan.md](docs/14_Frontend_Realism_Plan.md) | Frontend realism (Deloitte-grade) plan |
-| [docs/README.md](docs/README.md) | Full project overview |
-
-Source of truth for the problem statement: `TrustLedger_EOI_Enhanced.pptx`
+TrustLedger wraps around existing AI agents and captures a standardized,
+tamper-evident decision record **while the decision is happening** — so
+compliance and audit teams can understand, replay, and defend high-stakes
+AI decisions in minutes, not days.
 
 ---
 
-## Status
+## Why it exists
 
-**Sep 17 — reliability + UI pass.** The streaming research endpoint now runs in a
-background task, so a browser navigating away mid-run still seals the record
-instead of stranding the card in `running`; a wall-clock budget
-(`TRUSTLEDGER_RUN_BUDGET`, default 75s) guarantees a run cannot hang. Runs land
-in 4-10s on a pinned model. Truncated model JSON is repaired rather than dumped
-as raw text, and a response carrying none of the expected fields is rejected
-instead of sealing an empty record.
+AI systems make consequential decisions in seconds, but most organisations
+cannot answer the questions audits actually ask: *what was decided, on what
+evidence, by whom, and has anything changed since?* Reconstructing those
+answers from chat logs and prompts takes days — if it can be done at all.
 
-On the UI: a shared vocabulary (`frontend/src/lib/vocab.ts`) gives every status,
-outcome and risk level one label, one colour and one plain-English meaning;
-sealed records advertise their immutability instead of offering actions the API
-refuses; the decision graph is redrawn as a single computed SVG; and the live
-panel shows readable progress rather than raw JSON.
+TrustLedger records the decision as it happens, seals it to a hash chain,
+and proves it hasn't been altered.
 
-**Known limits — read before demoing:**
-- Cited sources are **asserted by the model, not retrieved**. No URL, no fetch,
-  no verification that a cited document exists. See `docs/12`.
-- The hash chain is **unkeyed**. It detects a post-hoc edit, but anyone who can
-  write to the database can recompute the whole chain. Tamper-evident, not
-  tamper-proof.
+## What it does
+
+- **Live research pipeline** — ask a question, watch evidence stream in, get a
+  recommendation sealed to the chain in seconds (4–10 s on the pinned model).
+- **Command Center** — a Kanban board of every decision — queued, running,
+  review-ready, completed — each with a case code, risk level and owner.
+- **Every query gets a code** — a unique, collision-checked
+  `RES-YYYY-######` identifier, referable forever.
+- **The record** — four tabs per decision: **Summary**, **Decision Trail**,
+  **Replay**, **Integrity** (hash verification).
+- **Human review routing** — high-risk decisions are routed to a person
+  before they're treated as final.
+- **Tamper evidence** — every sealed record is SHA-256 chained; an edit after
+  sealing breaks the chain and is flagged in the UI. Sealed records refuse
+  edits and deletes (`409 · TASK_SEALED`).
+- **Audit identity** — API-key auth per principal; every event is stamped
+  with the actor that caused it and sealed with the record.
+- **Reliable by design** — runs execute in background tasks with a wall-clock
+  budget (`TRUSTLEDGER_RUN_BUDGET`, default 75 s); a browser navigating away
+  mid-run still seals the record.
+
+## Quick start
+
+### 1. Environment
+
+Copy `.env.example` to `.env` and fill in values. **Nothing in the backend
+loads `.env`** — export the variables in your shell (Docker Compose picks
+them up via `env_file`):
+
+```bash
+export TRUSTLEDGER_API_KEYS='compliance-analyst:<key>,claims-auditor:<key>'
+export OPENROUTER_API_KEY=sk-or-...
+export TRUSTLEDGER_MODEL=openai/gpt-4o-mini   # pin a model; the free router is unreliable
+```
+
+Authentication is enforced whenever `TRUSTLEDGER_API_KEYS` is set; with no
+key variables configured, the API runs in open development mode. A
+present-but-malformed key configuration **fails closed** at boot — it never
+silently disables auth.
+
+### 2. Backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000   # → http://localhost:8000/docs
+```
+
+Tables are created automatically on boot. Storage: PostgreSQL when
+`DATABASE_URL` (or `POSTGRES_*`) is set, SQLite otherwise.
+
+### 3. Seed the demo dataset
+
+```bash
+cd backend
+python -m seed.load_demo_data            # 16 records; refuses if data exists
+python -m seed.load_demo_data --force    # wipe and reseed
+```
+
+The seed includes the hero case `RES-2026-004821` (Tata Power, Rajasthan EV
+charging) and one deliberately tampered record — `RES-2026-009999` — for
+the integrity-failure demo.
+
+### 4. Frontend
+
+```bash
+cd frontend
+NEXT_PUBLIC_TRUSTLEDGER_API_KEY=<key> npm run dev   # → http://localhost:3000
+```
+
+`NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000/api/v1`. Both are
+baked into the client bundle when the dev server starts — restart it after
+changing either.
+
+### 5. Tests
+
+```bash
+cd backend && python -m pytest tests -q    # 38 passed
+```
+
+## Architecture
+
+```
+Browser (Next.js) ── REST + SSE ──► FastAPI ──► OpenRouter (pinned model)
+                                      │   ▲
+                                      │   └── in-process dispatcher (0.7 s poll)
+                                      ▼
+                        PostgreSQL / SQLite (JSONB)
+                                      │
+                                      └──► SHA-256 hash chain (sealing, verify)
+```
+
+The research endpoint returns a task id immediately; the run happens in a
+background worker that streams events back over SSE. The board's read path
+never touches the LLM — it answers in ~20 ms.
+
+## API (v1)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/research/stream` | live research run (SSE) |
+| `GET /api/v1/decisions` | the board |
+| `GET /api/v1/decisions/{id}` | full sealed record |
+| `GET /api/v1/decisions/{id}/replay` | decision trail |
+| `GET /api/v1/decisions/{id}/verify` | per-record integrity check |
+| `GET /api/v1/decisions/chain/verify` | whole-chain verification |
+| `POST /api/v1/decisions/queue` `start` `events` `complete` | agent integration |
+| `DELETE /api/v1/decisions/{id}` | unsealed records only (sealed → 409) |
+
+All API routes except `/health` and `/docs` require
+`Authorization: Bearer <key>` when auth is enabled.
+
+## Deployment
+
+- **Docker Compose** (`docker compose up --build`) runs Postgres + backend +
+  frontend; the frontend image is a production build (`next build` +
+  `next start`).
+- **CORS** — deployed frontend origins are allowed by setting
+  `TRUSTLEDGER_CORS_ORIGINS` (comma-separated) on the backend.
+- **Keys** — generate fresh principal keys for any deployed environment;
+  the browser-held key is a demo convenience, not a production pattern.
+
+## Project structure
+
+```
+backend/
+  app/                 FastAPI app (routes, services, security)
+  agents/              ResearchAgent + in-process dispatcher
+  seed/                16-record demo dataset + loader
+  tests/               38 tests
+frontend/
+  src/app/             entry screen, command center, decision records
+  src/components/      board, graph, timeline, replay, integrity panels
+docs/                  00–14: PRD, architecture, design, roadmap
+```
+
+## Documentation
+
+| Document | Covers |
+|---|---|
+| `docs/00_Project_Summary.md` | thesis, MVP, risks, priorities |
+| `docs/05_Tech_Stack_and_Architecture.md` | FastAPI + OpenRouter + hash chain |
+| `docs/06_Demo_Showcase_Flow.md` | 3–5 minute evaluator demo script |
+| `docs/09_HLD.md` | high-level design |
+| `docs/10_Current_Status.md` | implementation status |
+| `docs/12_Graph_Knowledge_System.md` | evidence graph scope |
+
+## Known limitations
+
+- Cited sources are **asserted by the model, not retrieved** — no fetch, no
+  verification that a cited document exists.
+- The hash chain is **unkeyed**: tamper-evident, not tamper-proof — anyone
+  with database write access could recompute the chain.
 - `GET /decisions/{id}` serves the sealed snapshot **without verifying it
-  first**, so a tampered record still reads clean on the Summary tab. Fixing
-  this is the top open item.
-- The same question can return different outcomes across runs (temperature 0.4).
-- Authentication is API-key based (`TRUSTLEDGER_API_KEYS`, principal stamped into every event's `actor` and sealed into the chain). Full RBAC with row-scoped roles, and encryption at rest, are designed but not built.
+  first**.
+- The same question can return different outcomes across runs
+  (temperature 0.4).
+- Authentication is API-key based; RBAC and encryption at rest are designed
+  but not built.
 
-Prior milestones: logging API, SHA-256 hash chain, Kanban + 4-tab record view,
-research pivot, 16-record seed (hero `RES-2026-004821`, deliberately tampered
-`RES-2026-009999`). `23/23` backend tests pass; frontend builds clean.
+## Team
 
-**Run:** put `OPENROUTER_API_KEY` in `.env`, then start the backend and frontend
-(see `docs/README.md`). Note that **nothing in the backend loads `.env`** — there
-is no `python-dotenv` — so a local `uvicorn` run needs the variables exported by
-hand. Docker Compose picks them up via `env_file`.
+Team Diet Coke · Manipal University Jaipur · Deloitte Capstone 2026
 
-`TRUSTLEDGER_MODEL` defaults to `openai/gpt-4o-mini`. The `openrouter/free`
-router is cheaper but picks a different model per request: across three test
-runs it returned one empty response and one web-search tool call instead of an
-answer. Pin a model for anything you intend to demo.
