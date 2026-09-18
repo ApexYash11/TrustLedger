@@ -259,9 +259,9 @@ export default function DashboardPage() {
     api
       .queueDecision({
         agent_id: agentId,
-        case_id: title,
+        case_id: "", // backend generates the RES-YYYY-###### code
         case_type: caseType || "Market Entry Assessment",
-        inputs: { client_name: title, research_question: caseType || title },
+        inputs: { research_question: title },
       })
       .then(() => refresh())
       .catch(() => {

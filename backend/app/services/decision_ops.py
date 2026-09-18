@@ -6,6 +6,7 @@ one place: a task can only reach a terminal state (``completed`` / ``review_requ
 through :func:`complete_decision`, which always produces a sealed ``Decision`` +
 ``AuditRecord``. Manual ``status`` patches are restricted to non-terminal moves.
 """
+import uuid
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,18 @@ from .event_hub import emit_event
 from .redaction import redact_inputs
 
 TERMINAL_STATUSES = {"completed", "review_required"}
+
+
+def generate_case_id(db: Session) -> str:
+    """A fresh ``RES-YYYY-######`` case code, collision-checked against the ledger.
+
+    Used by the Add Task flow (the board creates cards without a client-supplied
+    case id); external agent integrations may still bring their own identifiers.
+    """
+    case_id = f"RES-{utcnow():%Y}-{uuid.uuid4().int % 1_000_000:06d}"
+    while db.query(Task).filter(Task.case_id == case_id).first():
+        case_id = f"RES-{utcnow():%Y}-{uuid.uuid4().int % 1_000_000:06d}"
+    return case_id
 #: non-terminal statuses a manual PATCH may move a card between (dragging the card)
 NON_TERMINAL_STATUSES = {"queued", "running", "disputed"}
 

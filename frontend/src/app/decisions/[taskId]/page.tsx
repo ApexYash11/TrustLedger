@@ -264,7 +264,7 @@ export default function DecisionDetailPage() {
         </div>
         <div className="flex gap-2.5">
           <a
-            href="/"
+            href="/command-center"
             className="rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-fg no-underline hover:brightness-95"
           >
             Back to board
@@ -319,7 +319,7 @@ export default function DecisionDetailPage() {
               <span className="text-[17px] font-semibold tracking-[-.3px] text-text">TrustLedger</span>
             </a>
             <a
-              href="/"
+              href="/command-center"
               className="inline-block rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs font-medium text-text-2 no-underline hover:bg-hover"
             >
               ← Back to board
